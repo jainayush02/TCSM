@@ -1,0 +1,153 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 1991 >>
+stream
+0.05 0.15 0.35 rg
+40 705 532 55 re f
+1 1 1 rg
+BT
+/F2 16 Tf
+55 738 Td
+(AMDOCS TELECOM SERVICES LIMITED) Tj
+/F1 10 Tf
+0 -16 Td
+(OFFICIAL TAX INVOICE & PAYMENT RECEIPT) Tj
+ET
+0.8 0.2 0.1 rg
+460 715 100 35 re f
+1 1 1 rg
+BT
+/F2 13 Tf
+478 728 Td
+(UNPAID) Tj
+ET
+0.95 0.95 0.97 rg
+40 620 532 75 re f
+0.8 0.8 0.85 RG
+1 w
+40 620 532 75 re S
+0 0 0 rg
+BT
+/F2 11 Tf
+55 675 Td
+(Invoice Details) Tj
+/F1 10 Tf
+0 -15 Td
+(Invoice Number: INV-2026-09-7649-4) Tj
+0 -13 Td
+(Billing Month: 2026-09   |   Generated: 29-Sept-2026 17:50) Tj
+0 -13 Td
+(Due Date: 2026-10-14   |   Status: UNPAID) Tj
+ET
+0.95 0.95 0.97 rg
+40 510 532 100 re f
+0.8 0.8 0.85 RG
+40 510 532 100 re S
+0 0 0 rg
+BT
+/F2 11 Tf
+55 590 Td
+(Customer & Subscription Information) Tj
+/F1 10 Tf
+0 -15 Td
+(Customer Name : Ayush Jain   |   Customer ID: CUST943125) Tj
+0 -13 Td
+(Mobile Number : 9685454511   |   Email: ayush@gmail.com) Tj
+0 -13 Td
+(City / Country: khetia, India) Tj
+0 -13 Td
+(Subscribed Plan: Business Pro \(PLAN-103\)) Tj
+ET
+0.05 0.15 0.35 rg
+40 460 532 24 re f
+1 1 1 rg
+BT
+/F2 10 Tf
+55 468 Td
+(Description) Tj
+380 0 Td
+(Amount \(INR\)) Tj
+ET
+0 0 0 rg
+BT
+/F1 10 Tf
+55 438 Td
+(1. Monthly Plan Base Rental) Tj
+380 0 Td
+(INR    1499.00) Tj
+-380 -18 Td
+(2. Usage, Voice & Roaming Charges) Tj
+380 0 Td
+(INR       0.00) Tj
+-380 -18 Td
+(3. Goods & Services Tax \(18%% GST\)) Tj
+380 0 Td
+(INR     269.82) Tj
+ET
+0.7 0.7 0.7 RG
+1 w
+40 360 532 0 re S
+0.9 0.95 1.0 rg
+40 325 532 30 re f
+0.05 0.15 0.35 RG
+2 w
+40 325 532 30 re S
+0.05 0.15 0.35 rg
+BT
+/F2 12 Tf
+55 335 Td
+(TOTAL NET PAYABLE AMOUNT) Tj
+360 0 Td
+(INR    1768.82) Tj
+ET
+0 0 0 rg
+BT
+/F2 11 Tf
+55 295 Td
+(Payment Details) Tj
+/F1 10 Tf
+0 -15 Td
+(Payment Status    : UNPAID - Pending Customer Payment) Tj
+0 -13 Td
+(Please pay on or before 2026-10-14 via UPI, Card, or Net Banking) Tj
+ET
+0.5 0.5 0.5 rg
+BT
+/F1 9 Tf
+55 80 Td
+(Amdocs Telecom Solutions | support@amdocs-telecom.com | Customer Care: 1800-123-456) Tj
+0 -12 Td
+(This is a computer-generated tax invoice. No signature required.) Tj
+ET
+
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000251 00000 n 
+0000002294 00000 n 
+0000002364 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+2439
+%%EOF

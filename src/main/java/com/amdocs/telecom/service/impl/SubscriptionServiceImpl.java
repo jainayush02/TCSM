@@ -16,14 +16,19 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+import com.amdocs.telecom.service.BillingService;
+import java.time.format.DateTimeFormatter;
+
 public class SubscriptionServiceImpl implements SubscriptionService {
 
     private final SubscriptionDAO subscriptionDAO;
     private final PlanDAO planDAO;
+    private final BillingService billingService;
 
     public SubscriptionServiceImpl() {
         this.subscriptionDAO = new SubscriptionDAOImpl();
         this.planDAO = new PlanDAOImpl();
+        this.billingService = new BillingServiceImpl();
     }
 
     @Override
@@ -66,7 +71,17 @@ public class SubscriptionServiceImpl implements SubscriptionService {
             sub.setSubscriptionType(plan.getPlanType());
             sub.setStatus("ACTIVE");
 
-            return subscriptionDAO.saveSubscription(sub);
+            MobileSubscription created = subscriptionDAO.saveSubscription(sub);
+
+            // Automatically generate the initial monthly bill for the new subscription
+            try {
+                String billingMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
+                billingService.generateMonthlyBill(created.getSubscriptionId(), billingMonth);
+            } catch (Exception ignored) {
+                // If already generated or fails, continue gracefully
+            }
+
+            return created;
         } catch (SQLException e) {
             throw new TelecomException("Database error: " + e.getMessage());
         }

@@ -17,6 +17,8 @@ public class Complaint {
     // Joined fields
     private String customerName;
     private String mobileNumber;
+    private String customerCity;
+    private String customerNumber;
 
     public Complaint() {}
 
@@ -70,6 +72,12 @@ public class Complaint {
 
     public String getMobileNumber() { return mobileNumber; }
     public void setMobileNumber(String mobileNumber) { this.mobileNumber = mobileNumber; }
+
+    public String getCustomerCity() { return customerCity; }
+    public void setCustomerCity(String customerCity) { this.customerCity = customerCity; }
+
+    public String getCustomerNumber() { return customerNumber; }
+    public void setCustomerNumber(String customerNumber) { this.customerNumber = customerNumber; }
 
     @Override
     public String toString() {

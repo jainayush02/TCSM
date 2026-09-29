@@ -72,3 +72,24 @@ INSERT INTO usage_records (subscription_id, usage_type, quantity, unit, charge) 
 INSERT INTO usage_records (subscription_id, usage_type, quantity, unit, charge) VALUES (1, 'SMS', 45.0, 'Count', 0.0);
 INSERT INTO usage_records (subscription_id, usage_type, quantity, unit, charge) VALUES (1, 'DATA', 2048.0, 'MB', 150.0);
 INSERT INTO usage_records (subscription_id, usage_type, quantity, unit, charge) VALUES (1, 'ROAMING', 30.0, 'Minutes', 170.0);
+
+-- 8. Sample Complaints
+INSERT INTO complaints (complaint_number, customer_id, subscription_id, category, description, priority, created_date, status, resolution)
+SELECT 'CMP-1001A1', 1, 1, 'NETWORK', 'Slow 5G internet speeds and call drops during peak hours in South Mumbai.', 'HIGH', CURRENT_TIMESTAMP, 'RESOLVED', 'Network cell tower 4B in South Mumbai optimized and antenna reoriented. Speeds verified above 150 Mbps.'
+WHERE NOT EXISTS (SELECT 1 FROM complaints WHERE complaint_number = 'CMP-1001A1');
+
+INSERT INTO complaints (complaint_number, customer_id, subscription_id, category, description, priority, created_date, status, resolution)
+SELECT 'CMP-1002B2', 1, 1, 'BILLING', 'Charged extra INR 170 for roaming when roaming was included.', 'MEDIUM', CURRENT_TIMESTAMP, 'OPEN', NULL
+WHERE NOT EXISTS (SELECT 1 FROM complaints WHERE complaint_number = 'CMP-1002B2');
+
+INSERT INTO complaints (complaint_number, customer_id, subscription_id, category, description, priority, created_date, status, resolution)
+SELECT 'CMP-1003C3', 2, NULL, 'NETWORK', 'Cannot connect to 4G LTE while traveling on underground commute routes.', 'LOW', CURRENT_TIMESTAMP, 'OPEN', NULL
+WHERE NOT EXISTS (SELECT 1 FROM complaints WHERE complaint_number = 'CMP-1003C3');
+
+INSERT INTO complaints (complaint_number, customer_id, subscription_id, category, description, priority, created_date, status, resolution)
+SELECT 'CMP-1004D4', 3, NULL, 'SIM', 'eSIM profile download QR code failed scanning twice.', 'HIGH', CURRENT_TIMESTAMP, 'RESOLVED', 'Fresh eSIM activation QR profile regenerated and emailed to customer. Profile successfully installed.'
+WHERE NOT EXISTS (SELECT 1 FROM complaints WHERE complaint_number = 'CMP-1004D4');
+
+INSERT INTO complaints (complaint_number, customer_id, subscription_id, category, description, priority, created_date, status, resolution)
+SELECT 'CMP-1005E5', 1, 1, 'PAYMENT', 'UPI transaction deducted twice during bill payment.', 'CRITICAL', CURRENT_TIMESTAMP, 'RESOLVED', 'Duplicate transaction INR 1152.42 verified. Automatic refund initiated to original bank account via PG gateway.'
+WHERE NOT EXISTS (SELECT 1 FROM complaints WHERE complaint_number = 'CMP-1005E5');

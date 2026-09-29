@@ -42,7 +42,8 @@ public class ComplaintDAOImpl implements ComplaintDAO {
 
     @Override
     public Optional<Complaint> findById(int complaintId) throws SQLException {
-        String sql = "SELECT cp.*, CONCAT(c.first_name, ' ', c.last_name) as customer_name, ms.mobile_number " +
+        String sql = "SELECT cp.*, CONCAT(c.first_name, ' ', c.last_name) as customer_name, " +
+                "c.city as customer_city, c.customer_number, ms.mobile_number " +
                 "FROM complaints cp " +
                 "JOIN customers c ON cp.customer_id = c.customer_id " +
                 "LEFT JOIN mobile_subscriptions ms ON cp.subscription_id = ms.subscription_id " +
@@ -61,7 +62,8 @@ public class ComplaintDAOImpl implements ComplaintDAO {
 
     @Override
     public Optional<Complaint> findByNumber(String complaintNumber) throws SQLException {
-        String sql = "SELECT cp.*, CONCAT(c.first_name, ' ', c.last_name) as customer_name, ms.mobile_number " +
+        String sql = "SELECT cp.*, CONCAT(c.first_name, ' ', c.last_name) as customer_name, " +
+                "c.city as customer_city, c.customer_number, ms.mobile_number " +
                 "FROM complaints cp " +
                 "JOIN customers c ON cp.customer_id = c.customer_id " +
                 "LEFT JOIN mobile_subscriptions ms ON cp.subscription_id = ms.subscription_id " +
@@ -81,7 +83,8 @@ public class ComplaintDAOImpl implements ComplaintDAO {
     @Override
     public List<Complaint> findByCustomerId(int customerId) throws SQLException {
         List<Complaint> list = new ArrayList<>();
-        String sql = "SELECT cp.*, CONCAT(c.first_name, ' ', c.last_name) as customer_name, ms.mobile_number " +
+        String sql = "SELECT cp.*, CONCAT(c.first_name, ' ', c.last_name) as customer_name, " +
+                "c.city as customer_city, c.customer_number, ms.mobile_number " +
                 "FROM complaints cp " +
                 "JOIN customers c ON cp.customer_id = c.customer_id " +
                 "LEFT JOIN mobile_subscriptions ms ON cp.subscription_id = ms.subscription_id " +
@@ -101,7 +104,8 @@ public class ComplaintDAOImpl implements ComplaintDAO {
     @Override
     public List<Complaint> findAll() throws SQLException {
         List<Complaint> list = new ArrayList<>();
-        String sql = "SELECT cp.*, CONCAT(c.first_name, ' ', c.last_name) as customer_name, ms.mobile_number " +
+        String sql = "SELECT cp.*, CONCAT(c.first_name, ' ', c.last_name) as customer_name, " +
+                "c.city as customer_city, c.customer_number, ms.mobile_number " +
                 "FROM complaints cp " +
                 "JOIN customers c ON cp.customer_id = c.customer_id " +
                 "LEFT JOIN mobile_subscriptions ms ON cp.subscription_id = ms.subscription_id " +
@@ -128,6 +132,94 @@ public class ComplaintDAOImpl implements ComplaintDAO {
         }
     }
 
+    @Override
+    public java.util.Map<String, int[]> getComplaintsCountByCity() throws SQLException {
+        java.util.Map<String, int[]> stats = new java.util.LinkedHashMap<>();
+        String sql = "SELECT c.city, " +
+                "COUNT(cp.complaint_id) as total_count, " +
+                "SUM(CASE WHEN cp.status = 'OPEN' THEN 1 ELSE 0 END) as open_count, " +
+                "SUM(CASE WHEN cp.status = 'IN_PROGRESS' THEN 1 ELSE 0 END) as in_progress_count, " +
+                "SUM(CASE WHEN cp.status = 'RESOLVED' OR cp.status = 'CLOSED' THEN 1 ELSE 0 END) as resolved_count " +
+                "FROM complaints cp " +
+                "JOIN customers c ON cp.customer_id = c.customer_id " +
+                "GROUP BY c.city " +
+                "ORDER BY total_count DESC, c.city ASC";
+        try (Connection conn = DBConnection.getInstance().getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                String city = rs.getString("city");
+                if (city == null || city.trim().isEmpty()) city = "Unknown";
+                int total = rs.getInt("total_count");
+                int open = rs.getInt("open_count");
+                int inProg = rs.getInt("in_progress_count");
+                int resolved = rs.getInt("resolved_count");
+                stats.put(city, new int[]{total, open, inProg, resolved});
+            }
+        }
+        return stats;
+    }
+
+    @Override
+    public java.util.Map<String, int[]> getComplaintsCountByCategory() throws SQLException {
+        java.util.Map<String, int[]> stats = new java.util.LinkedHashMap<>();
+        String sql = "SELECT cp.category, " +
+                "COUNT(cp.complaint_id) as total_count, " +
+                "SUM(CASE WHEN cp.status = 'OPEN' THEN 1 ELSE 0 END) as open_count, " +
+                "SUM(CASE WHEN cp.status = 'IN_PROGRESS' THEN 1 ELSE 0 END) as in_progress_count, " +
+                "SUM(CASE WHEN cp.status = 'RESOLVED' OR cp.status = 'CLOSED' THEN 1 ELSE 0 END) as resolved_count " +
+                "FROM complaints cp " +
+                "GROUP BY cp.category " +
+                "ORDER BY total_count DESC";
+        try (Connection conn = DBConnection.getInstance().getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                String cat = rs.getString("category");
+                int total = rs.getInt("total_count");
+                int open = rs.getInt("open_count");
+                int inProg = rs.getInt("in_progress_count");
+                int resolved = rs.getInt("resolved_count");
+                stats.put(cat, new int[]{total, open, inProg, resolved});
+            }
+        }
+        return stats;
+    }
+
+    @Override
+    public List<java.util.Map<String, Object>> getTopCustomersByComplaints(int limit) throws SQLException {
+        List<java.util.Map<String, Object>> list = new ArrayList<>();
+        String sql = "SELECT c.customer_id, c.customer_number, CONCAT(c.first_name, ' ', c.last_name) as customer_name, " +
+                "c.city, c.mobile_number, " +
+                "COUNT(cp.complaint_id) as total_count, " +
+                "SUM(CASE WHEN cp.status = 'OPEN' OR cp.status = 'IN_PROGRESS' THEN 1 ELSE 0 END) as pending_count, " +
+                "SUM(CASE WHEN cp.status = 'RESOLVED' OR cp.status = 'CLOSED' THEN 1 ELSE 0 END) as resolved_count " +
+                "FROM complaints cp " +
+                "JOIN customers c ON cp.customer_id = c.customer_id " +
+                "GROUP BY c.customer_id, c.customer_number, c.first_name, c.last_name, c.city, c.mobile_number " +
+                "ORDER BY total_count DESC " +
+                "LIMIT ?";
+        try (Connection conn = DBConnection.getInstance().getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, limit > 0 ? limit : 10);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    java.util.Map<String, Object> map = new java.util.HashMap<>();
+                    map.put("customerId", rs.getInt("customer_id"));
+                    map.put("customerNumber", rs.getString("customer_number"));
+                    map.put("customerName", rs.getString("customer_name"));
+                    map.put("city", rs.getString("city"));
+                    map.put("mobileNumber", rs.getString("mobile_number"));
+                    map.put("totalCount", rs.getInt("total_count"));
+                    map.put("pendingCount", rs.getInt("pending_count"));
+                    map.put("resolvedCount", rs.getInt("resolved_count"));
+                    list.add(map);
+                }
+            }
+        }
+        return list;
+    }
+
     private Complaint mapResultSetToComplaint(ResultSet rs) throws SQLException {
         Complaint cp = new Complaint();
         cp.setComplaintId(rs.getInt("complaint_id"));
@@ -146,8 +238,19 @@ public class ComplaintDAOImpl implements ComplaintDAO {
 
         cp.setStatus(rs.getString("status"));
         cp.setResolution(rs.getString("resolution"));
-        cp.setCustomerName(rs.getString("customer_name"));
-        cp.setMobileNumber(rs.getString("mobile_number"));
+        
+        try {
+            cp.setCustomerName(rs.getString("customer_name"));
+        } catch (SQLException ignored) {}
+        try {
+            cp.setCustomerCity(rs.getString("customer_city"));
+        } catch (SQLException ignored) {}
+        try {
+            cp.setCustomerNumber(rs.getString("customer_number"));
+        } catch (SQLException ignored) {}
+        try {
+            cp.setMobileNumber(rs.getString("mobile_number"));
+        } catch (SQLException ignored) {}
 
         return cp;
     }

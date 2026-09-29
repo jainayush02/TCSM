@@ -15,6 +15,7 @@ import com.amdocs.telecom.service.*;
 import com.amdocs.telecom.service.impl.*;
 
 import java.sql.SQLException;
+import java.time.format.DateTimeFormatter;
 import java.util.DoubleSummaryStatistics;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +32,7 @@ public class AdminController {
     private final CustomerService customerService;
     private final BillingService billingService;
     private final ReportService reportService;
+    private final ComplaintService complaintService;
     private final AuditAndNotificationDAO auditDAO;
     private final com.amdocs.telecom.report.ReportGenerator reportGenerator;
     private final Scanner scanner;
@@ -43,6 +45,7 @@ public class AdminController {
         this.customerService = new CustomerServiceImpl();
         this.billingService = new BillingServiceImpl();
         this.reportService = new ReportServiceImpl();
+        this.complaintService = new ComplaintServiceImpl();
         this.auditDAO = new AuditAndNotificationDAOImpl();
         this.reportGenerator = new com.amdocs.telecom.report.ReportGenerator();
     }
@@ -153,9 +156,11 @@ public class AdminController {
             System.out.println("║  9.  Process Bulk Usage              ║");
             System.out.println("║  10. Revenue Reports                 ║");
             System.out.println("║  11. Customer Distribution by City   ║");
-            System.out.println("║  12. View Audit Logs                 ║");
-            System.out.println("║  13. Change My Password              ║");
-            System.out.println("║  14. Logout                          ║");
+            System.out.println("║  12. Customer Complaints & Resolve   ║");
+            System.out.println("║  13. Complaint Hotspots & Analytics  ║");
+            System.out.println("║  14. View Audit Logs                 ║");
+            System.out.println("║  15. Change My Password              ║");
+            System.out.println("║  16. Logout                          ║");
             System.out.println("╚══════════════════════════════════════╝");
             System.out.print("Select option: ");
             if (!scanner.hasNextLine()) break;
@@ -173,9 +178,11 @@ public class AdminController {
                 case 9  -> processBulkUsage();
                 case 10 -> showRevenueReports();
                 case 11 -> showCustomerDistribution();
-                case 12 -> viewAuditLogs();
-                case 13 -> handleAdminChangePassword();
-                case 14 -> {
+                case 12 -> manageComplaints();
+                case 13 -> showComplaintHotspotsAndAnalytics();
+                case 14 -> viewAuditLogs();
+                case 15 -> handleAdminChangePassword();
+                case 16 -> {
                     System.out.println("Admin logged out.");
                     loggedInAdmin = null;
                     running = false;
@@ -383,6 +390,307 @@ public class AdminController {
             }
         }
         System.out.println("└──────────────────────────────────────┘");
+    }
+
+    private void manageComplaints() {
+        boolean inMenu = true;
+        while (inMenu) {
+            System.out.println("\n╔══════════════════════════════════════╗");
+            System.out.println("║     CUSTOMER COMPLAINT MANAGEMENT    ║");
+            System.out.println("╠══════════════════════════════════════╣");
+            System.out.println("║  1. View All Complaints              ║");
+            System.out.println("║  2. View Pending Complaints (OPEN)   ║");
+            System.out.println("║  3. View Complaint Details           ║");
+            System.out.println("║  4. Resolve / Update a Complaint     ║");
+            System.out.println("║  5. Back to Admin Dashboard          ║");
+            System.out.println("╚══════════════════════════════════════╝");
+            System.out.print("Select option: ");
+            if (!scanner.hasNextLine()) break;
+
+            int choice = readInt();
+            switch (choice) {
+                case 1 -> listComplaints(null);
+                case 2 -> listComplaints("OPEN");
+                case 3 -> viewSingleComplaintDetails();
+                case 4 -> handleResolveComplaint();
+                case 5 -> inMenu = false;
+                default -> System.out.println("Invalid option. Please choose 1 to 5.");
+            }
+        }
+    }
+
+    private void listComplaints(String filterStatus) {
+        List<Complaint> all = complaintService.getAllComplaints();
+        List<Complaint> list = (filterStatus != null) ?
+                all.stream().filter(c -> filterStatus.equalsIgnoreCase(c.getStatus())).toList() : all;
+
+        String title = (filterStatus != null) ? "PENDING / OPEN CUSTOMER COMPLAINTS" : "ALL CUSTOMER COMPLAINTS";
+        System.out.println("\n┌─── " + title + " " + "─".repeat(Math.max(0, 85 - title.length())) + "┐");
+        if (list.isEmpty()) {
+            System.out.println("  No complaints found matching criteria.");
+            System.out.println("└" + "─".repeat(90) + "┘");
+            return;
+        }
+
+        System.out.printf("  %-4s %-12s %-18s %-12s %-10s %-8s %-11s %s%n",
+                "ID", "Ticket No", "Customer Name", "City", "Category", "Priority", "Status", "Date Lodged");
+        System.out.println("  " + "-".repeat(90));
+
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        for (Complaint c : list) {
+            String dateStr = c.getCreatedDate() != null ? c.getCreatedDate().format(dtf) : "N/A";
+            String custName = c.getCustomerName() != null ? c.getCustomerName() : "Cust #" + c.getCustomerId();
+            String city = c.getCustomerCity() != null ? c.getCustomerCity() : "-";
+            System.out.printf("  %-4d %-12s %-18s %-12s %-10s %-8s %-11s %s%n",
+                    c.getComplaintId(),
+                    c.getComplaintNumber(),
+                    custName.length() > 18 ? custName.substring(0, 18) : custName,
+                    city.length() > 12 ? city.substring(0, 12) : city,
+                    c.getCategory(),
+                    c.getPriority(),
+                    c.getStatus(),
+                    dateStr);
+        }
+        System.out.println("└" + "─".repeat(90) + "┘");
+
+        long openCount = all.stream().filter(c -> "OPEN".equalsIgnoreCase(c.getStatus())).count();
+        long inProgCount = all.stream().filter(c -> "IN_PROGRESS".equalsIgnoreCase(c.getStatus())).count();
+        long resolvedCount = all.stream().filter(c -> "RESOLVED".equalsIgnoreCase(c.getStatus()) || "CLOSED".equalsIgnoreCase(c.getStatus())).count();
+        System.out.printf("  Summary: Total: %d | Pending/Open: %d | In Progress: %d | Resolved: %d%n",
+                all.size(), openCount, inProgCount, resolvedCount);
+    }
+
+    private void viewSingleComplaintDetails() {
+        System.out.print("\nEnter Complaint ID or Ticket Number (or 'cancel'): ");
+        String query = scanner.nextLine().trim();
+        if ("cancel".equalsIgnoreCase(query) || query.isEmpty()) return;
+
+        Optional<Complaint> opt = findComplaintByIdOrNumber(query);
+        if (!opt.isPresent()) {
+            System.out.println("❌ Complaint not found for: " + query);
+            return;
+        }
+
+        printComplaintDetailsCard(opt.get());
+    }
+
+    private void handleResolveComplaint() {
+        System.out.print("\nEnter Complaint ID or Ticket Number to Resolve (or 'cancel'): ");
+        String query = scanner.nextLine().trim();
+        if ("cancel".equalsIgnoreCase(query) || query.isEmpty()) return;
+
+        Optional<Complaint> opt = findComplaintByIdOrNumber(query);
+        if (!opt.isPresent()) {
+            System.out.println("❌ Complaint not found for: " + query);
+            return;
+        }
+
+        Complaint cp = opt.get();
+        printComplaintDetailsCard(cp);
+
+        System.out.println("\nSelect Resolution Status:");
+        System.out.println("  1. RESOLVED (Issue fixed, solution applied)");
+        System.out.println("  2. IN_PROGRESS (Investigation ongoing, engineer dispatched)");
+        System.out.println("  3. CLOSED (Complaint settled and closed)");
+        System.out.print("Choose status (1-3, Default: 1): ");
+        String sChoice = scanner.nextLine().trim();
+        String newStatus = switch (sChoice) {
+            case "2" -> "IN_PROGRESS";
+            case "3" -> "CLOSED";
+            default -> "RESOLVED";
+        };
+
+        System.out.println("Enter Solution / Resolution Action Taken (Required):");
+        System.out.print("Solution: ");
+        String resolution = scanner.nextLine().trim();
+        if (resolution.isEmpty()) {
+            System.out.println("❌ Resolution description cannot be empty. Action cancelled.");
+            return;
+        }
+
+        try {
+            boolean success = complaintService.resolveComplaint(cp.getComplaintId(), newStatus, resolution, loggedInAdmin.getUsername());
+            if (success) {
+                System.out.println("\n✅ Complaint [" + cp.getComplaintNumber() + "] successfully updated to " + newStatus + "!");
+                System.out.println("   Solution Logged : " + resolution);
+                System.out.println("   Customer Alert  : Notification automatically delivered to customer portal.");
+            } else {
+                System.out.println("❌ Failed to update complaint status in database.");
+            }
+        } catch (Exception e) {
+            System.out.println("❌ Error: " + e.getMessage());
+        }
+    }
+
+    private Optional<Complaint> findComplaintByIdOrNumber(String query) {
+        try {
+            int id = Integer.parseInt(query);
+            Optional<Complaint> byId = complaintService.getComplaintById(id);
+            if (byId.isPresent()) return byId;
+        } catch (NumberFormatException ignored) {}
+        return complaintService.getComplaintByNumber(query.toUpperCase());
+    }
+
+    private void printComplaintDetailsCard(Complaint cp) {
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        String dateStr = cp.getCreatedDate() != null ? cp.getCreatedDate().format(dtf) : "N/A";
+        String statusSymbol = switch (cp.getStatus()) {
+            case "RESOLVED" -> "✅ RESOLVED";
+            case "CLOSED" -> "🔒 CLOSED";
+            case "IN_PROGRESS" -> "⚙️ IN_PROGRESS";
+            default -> "⏳ OPEN";
+        };
+
+        System.out.println("\n╔══════════════════════════════════════════════════════════════════════════╗");
+        System.out.println("║                    COMPLAINT & RESOLUTION DOSSIER                        ║");
+        System.out.println("╠══════════════════════════════════════════════════════════════════════════╣");
+        System.out.printf("║  Complaint ID    : %-53d ║%n", cp.getComplaintId());
+        System.out.printf("║  Ticket Number   : %-53s ║%n", cp.getComplaintNumber());
+        System.out.printf("║  Date Lodged     : %-53s ║%n", dateStr);
+        System.out.printf("║  Customer Name   : %-53s ║%n", (cp.getCustomerName() != null ? cp.getCustomerName() : "Cust #" + cp.getCustomerId()));
+        if (cp.getCustomerNumber() != null) {
+            System.out.printf("║  Customer Number : %-53s ║%n", cp.getCustomerNumber());
+        }
+        System.out.printf("║  Location / City : %-53s ║%n", (cp.getCustomerCity() != null ? cp.getCustomerCity() : "N/A"));
+        System.out.printf("║  Mobile Number   : %-53s ║%n", (cp.getMobileNumber() != null ? cp.getMobileNumber() : "N/A"));
+        System.out.printf("║  Category        : %-53s ║%n", cp.getCategory());
+        System.out.printf("║  Priority        : %-53s ║%n", cp.getPriority());
+        System.out.printf("║  Current Status  : %-53s ║%n", statusSymbol);
+        System.out.println("╠══════════════════════════════════════════════════════════════════════════╣");
+        System.out.println("║  CUSTOMER ISSUE DESCRIPTION:                                             ║");
+        printWrappedBoxText(cp.getDescription(), 70);
+        System.out.println("╠══════════════════════════════════════════════════════════════════════════╣");
+        System.out.println("║  OFFICIAL SOLUTION & ACTION TAKEN:                                       ║");
+        if (cp.getResolution() != null && !cp.getResolution().trim().isEmpty()) {
+            printWrappedBoxText(cp.getResolution(), 70);
+        } else {
+            System.out.println("║  [No resolution recorded yet. Use Option 4 to resolve this complaint.]   ║");
+        }
+        System.out.println("╚══════════════════════════════════════════════════════════════════════════╝");
+    }
+
+    private void printWrappedBoxText(String text, int maxWidth) {
+        if (text == null || text.trim().isEmpty()) {
+            System.out.println("║  (None)                                                                  ║");
+            return;
+        }
+        String[] words = text.split("\\s+");
+        StringBuilder currentLine = new StringBuilder();
+        for (String w : words) {
+            if (currentLine.length() + w.length() + 1 > maxWidth) {
+                System.out.printf("║  %-70s ║%n", currentLine.toString());
+                currentLine.setLength(0);
+            }
+            if (currentLine.length() > 0) currentLine.append(" ");
+            currentLine.append(w);
+        }
+        if (currentLine.length() > 0) {
+            System.out.printf("║  %-70s ║%n", currentLine.toString());
+        }
+    }
+
+    private void showComplaintHotspotsAndAnalytics() {
+        System.out.println("\n┌─── COMPLAINT HOTSPOTS & ANALYTICS ──────────────────────────────────────────┐");
+        System.out.println("  Intelligence Report: Where Complaints Are Highest & Actionable Hotspots");
+        System.out.println("  " + "-".repeat(76));
+
+        Map<String, int[]> cityStats = complaintService.getComplaintsCountByCity();
+        Map<String, int[]> catStats = complaintService.getComplaintsCountByCategory();
+        List<Map<String, Object>> topCustomers = complaintService.getTopCustomersByComplaints(10);
+
+        int grandTotal = cityStats.values().stream().mapToInt(a -> a[0]).sum();
+        int totalOpen = cityStats.values().stream().mapToInt(a -> a[1]).sum();
+        int totalInProg = cityStats.values().stream().mapToInt(a -> a[2]).sum();
+        int totalResolved = cityStats.values().stream().mapToInt(a -> a[3]).sum();
+        double resolutionRate = grandTotal > 0 ? ((double) totalResolved / grandTotal) * 100.0 : 0.0;
+
+        System.out.printf("  📊 Overall System Metrics:%n");
+        System.out.printf("     • Total Complaints Filed : %d%n", grandTotal);
+        System.out.printf("     • Pending / Open Issues  : %d%n", totalOpen);
+        System.out.printf("     • In Progress Issues     : %d%n", totalInProg);
+        System.out.printf("     • Resolved Issues        : %d%n", totalResolved);
+        System.out.printf("     • Overall Resolution Rate: %.1f%%%n%n", resolutionRate);
+
+        if (grandTotal == 0) {
+            System.out.println("  No customer complaints recorded in the system yet.");
+            System.out.println("└─────────────────────────────────────────────────────────────────────────────┘");
+            return;
+        }
+
+        // Section 1: Hotspots by Location / City
+        System.out.println("  📍 1. COMPLAINT HOTSPOTS BY CITY / LOCATION (Where complaints are highest):");
+        System.out.printf("  %-4s %-16s %7s %6s %8s %8s %8s   %s%n",
+                "Rank", "City / Area", "Total", "Open", "In-Prog", "Resolved", "Share %", "Hotspot Level");
+        System.out.println("  " + "-".repeat(76));
+
+        int rank = 1;
+        for (Map.Entry<String, int[]> entry : cityStats.entrySet()) {
+            String city = entry.getKey();
+            int[] c = entry.getValue();
+            double share = grandTotal > 0 ? ((double) c[0] / grandTotal) * 100.0 : 0.0;
+
+            String hotspotBadge;
+            if (share >= 35.0 || c[0] >= 5) {
+                hotspotBadge = "🔥 HIGH HOTSPOT (Attention Required)";
+            } else if (share >= 20.0 || c[0] >= 3) {
+                hotspotBadge = "⚠️ MODERATE HOTSPOT";
+            } else {
+                hotspotBadge = "🟢 NORMAL";
+            }
+
+            System.out.printf("  %-4d %-16s %7d %6d %8d %8d %7.1f%%   %s%n",
+                    rank++, city, c[0], c[1], c[2], c[3], share, hotspotBadge);
+        }
+
+        // Section 2: Distribution by Category
+        System.out.println("\n  🏷️ 2. COMPLAINT DISTRIBUTION BY PROBLEM CATEGORY:");
+        System.out.printf("  %-16s %7s %6s %8s %8s %8s%n",
+                "Category", "Total", "Open", "In-Prog", "Resolved", "Share %");
+        System.out.println("  " + "-".repeat(60));
+
+        for (Map.Entry<String, int[]> entry : catStats.entrySet()) {
+            String cat = entry.getKey();
+            int[] c = entry.getValue();
+            double share = grandTotal > 0 ? ((double) c[0] / grandTotal) * 100.0 : 0.0;
+            System.out.printf("  %-16s %7d %6d %8d %8d %7.1f%%%n",
+                    cat, c[0], c[1], c[2], c[3], share);
+        }
+
+        // Section 3: Top Complainant Customers
+        System.out.println("\n  👤 3. TOP COMPLAINANT CUSTOMERS (Customers raising the most complaints):");
+        System.out.printf("  %-12s %-18s %-12s %-12s %6s %8s %8s%n",
+                "Cust No", "Customer Name", "City", "Mobile", "Total", "Pending", "Resolved");
+        System.out.println("  " + "-".repeat(76));
+
+        for (Map<String, Object> map : topCustomers) {
+            String custNo = String.valueOf(map.get("customerNumber"));
+            String name = String.valueOf(map.get("customerName"));
+            String city = String.valueOf(map.get("city"));
+            String mob = String.valueOf(map.get("mobileNumber"));
+            int tot = (Integer) map.get("totalCount");
+            int pen = (Integer) map.get("pendingCount");
+            int res = (Integer) map.get("resolvedCount");
+
+            System.out.printf("  %-12s %-18s %-12s %-12s %6d %8d %8d%n",
+                    custNo,
+                    name.length() > 18 ? name.substring(0, 18) : name,
+                    city.length() > 12 ? city.substring(0, 12) : city,
+                    mob, tot, pen, res);
+        }
+
+        System.out.println("└─────────────────────────────────────────────────────────────────────────────┘");
+
+        // CSV Export Option
+        System.out.print("  Export Complaint Hotspot & Analytics Report to CSV? (Y/N): ");
+        String ans = scanner.nextLine().trim();
+        if ("Y".equalsIgnoreCase(ans)) {
+            try {
+                String path = reportGenerator.exportComplaintHotspotsToCsv(cityStats, catStats, topCustomers, "complaint_hotspots_report.csv");
+                System.out.println("  ✅ Complaint hotspot report exported successfully to: " + path);
+            } catch (Exception e) {
+                System.out.println("  ❌ Export failed: " + e.getMessage());
+            }
+        }
     }
 
     private void viewAuditLogs() {

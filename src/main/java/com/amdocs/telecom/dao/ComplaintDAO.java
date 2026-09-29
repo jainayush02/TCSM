@@ -3,6 +3,7 @@ package com.amdocs.telecom.dao;
 import com.amdocs.telecom.model.Complaint;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public interface ComplaintDAO {
@@ -12,4 +13,9 @@ public interface ComplaintDAO {
     List<Complaint> findByCustomerId(int customerId) throws SQLException;
     List<Complaint> findAll() throws SQLException;
     boolean updateStatusAndResolution(int complaintId, String status, String resolution) throws SQLException;
+    
+    // Hotspot and analytics methods
+    Map<String, int[]> getComplaintsCountByCity() throws SQLException;
+    Map<String, int[]> getComplaintsCountByCategory() throws SQLException;
+    List<Map<String, Object>> getTopCustomersByComplaints(int limit) throws SQLException;
 }
