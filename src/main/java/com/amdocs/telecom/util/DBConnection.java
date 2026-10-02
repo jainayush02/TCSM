@@ -52,9 +52,9 @@ public class DBConnection {
             try {
                 Class.forName(properties.getProperty("db.driver", "com.mysql.cj.jdbc.Driver"));
                 return DriverManager.getConnection(
-                        properties.getProperty("db.url"),
-                        properties.getProperty("db.user"),
-                        properties.getProperty("db.password")
+                    properties.getProperty("db.url"),
+                    System.getenv().getOrDefault("TCSMS_DB_USER", properties.getProperty("db.user", "root")),
+                    System.getenv().getOrDefault("TCSMS_DB_PASSWORD", properties.getProperty("db.password", ""))
                 );
             } catch (Exception e) {
                 LOGGER.info("MySQL connection unavailable (" + e.getMessage() + "). Switching to local fallback database.");
@@ -74,10 +74,19 @@ public class DBConnection {
         }
     }
 
+    public String getActiveDatabaseName() {
+        try (Connection connection = getConnection()) {
+            return connection.getMetaData().getDatabaseProductName();
+        } catch (SQLException e) {
+            return "Unavailable (" + e.getMessage() + ")";
+        }
+    }
+
     public static void testAndInitializeDatabase() {
         try (Connection conn = DBConnection.getInstance().getConnection()) {
             LOGGER.info("Connected to database successfully: " + conn.getMetaData().getDatabaseProductName());
             runScript(conn, "schema.sql");
+            ensureAdministratorAccountStatusColumn(conn);
             runScript(conn, "seed.sql");
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Failed to initialize database tables", e);
@@ -116,6 +125,22 @@ public class DBConnection {
             }
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Notice while running " + scriptPath + ": " + e.getMessage());
+        }
+    }
+
+    private static void ensureAdministratorAccountStatusColumn(Connection conn) throws SQLException {
+        boolean exists = false;
+        try (java.sql.ResultSet columns = conn.getMetaData().getColumns(null, null, "ADMINISTRATORS", "ACCOUNT_STATUS")) {
+            while (columns.next()) {
+                exists = true;
+                break;
+            }
+        }
+
+        if (!exists) {
+            try (Statement statement = conn.createStatement()) {
+                statement.executeUpdate("ALTER TABLE administrators ADD COLUMN account_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'");
+            }
         }
     }
 }

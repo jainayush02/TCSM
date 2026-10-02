@@ -34,7 +34,7 @@ public class ReportServiceImpl implements ReportService {
             Map<Integer, Double> customerTotals = allBills.stream()
                     .collect(Collectors.groupingBy(
                             // Extract customer ID from subscription (Simplified by joining in DB in real world, but showing stream usage)
-                            bill -> getCustomerIdForBill(bill.getSubscriptionId()), 
+                            Bill::getCustomerId,
                             Collectors.summingDouble(Bill::getTotalAmount)
                     ));
 
@@ -103,10 +103,4 @@ public class ReportServiceImpl implements ReportService {
         }
     }
 
-    private int getCustomerIdForBill(int subscriptionId) {
-        // Simplified helper method for stream grouping
-        // In reality, Bill has customerName but we might need customerId directly in the DTO
-        // Since this is for demoing Streams, we will mock the relation here to satisfy the API
-        return 1; // Assuming we would query this or have it in Bill object
-    }
 }

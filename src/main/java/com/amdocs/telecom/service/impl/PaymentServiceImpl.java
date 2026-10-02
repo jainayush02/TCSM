@@ -11,6 +11,7 @@ import com.amdocs.telecom.model.AuditLog;
 import com.amdocs.telecom.model.Bill;
 import com.amdocs.telecom.model.Payment;
 import com.amdocs.telecom.model.PaymentMode;
+import com.amdocs.telecom.scheduler.PaymentNotificationService;
 import com.amdocs.telecom.service.PaymentService;
 import com.amdocs.telecom.util.DBConnection;
 
@@ -25,11 +26,17 @@ public class PaymentServiceImpl implements PaymentService {
     private final BillingDAO billingDAO;
     private final PaymentDAO paymentDAO;
     private final AuditAndNotificationDAO auditDAO;
+    private final PaymentNotificationService notificationService;
 
     public PaymentServiceImpl() {
+        this(null);
+    }
+
+    public PaymentServiceImpl(PaymentNotificationService notificationService) {
         this.billingDAO = new BillingDAOImpl();
         this.paymentDAO = new PaymentDAOImpl();
         this.auditDAO = new AuditAndNotificationDAOImpl();
+        this.notificationService = notificationService;
     }
 
     @Override
@@ -40,21 +47,21 @@ public class PaymentServiceImpl implements PaymentService {
             conn.setAutoCommit(false); // BEGIN JDBC TRANSACTION
 
             // 1. Validate Bill
-            Optional<Bill> billOpt = billingDAO.findById(billId);
+            Optional<Bill> billOpt = billingDAO.findById(conn, billId);
             if (!billOpt.isPresent()) {
                 throw new TelecomException("Bill not found.");
             }
             Bill bill = billOpt.get();
-            if (bill.getCustomerId() != customerId && bill.getCustomerId() != 0) { // simplified check, in real app need proper join or check
-                // For safety we should check if bill belongs to customer. Handled loosely here for demo
+            if (bill.getCustomerId() != customerId) {
+                throw new TelecomException("You are not authorized to pay this bill.");
             }
             if ("PAID".equals(bill.getBillStatus())) {
                 throw new TelecomException("Bill is already paid. Duplicate payment not allowed.");
             }
 
             // 2. Validate Amount
-            if (amount < bill.getTotalAmount()) {
-                throw new TelecomException("Payment amount is less than total due (₹" + bill.getTotalAmount() + "). Partial payments not allowed.");
+            if (Double.compare(amount, bill.getTotalAmount()) != 0) {
+                throw new TelecomException("Payment amount must exactly match the total due (₹" + bill.getTotalAmount() + ").");
             }
 
             // 3. Create Payment via Strategy Pattern
@@ -95,6 +102,10 @@ public class PaymentServiceImpl implements PaymentService {
 
             // COMMIT
             conn.commit();
+            if (notificationService != null) {
+                notificationService.sendNotification(customerId, "Payment received",
+                        "Payment " + savedPayment.getTransactionReference() + " was received for bill " + bill.getBillNumber() + ".");
+            }
             return savedPayment;
 
         } catch (SQLException | TelecomException e) {

@@ -21,5 +21,6 @@ public interface SubscriptionDAO {
     // SIM operations
     SIMCard saveSIM(SIMCard sim) throws SQLException;
     Optional<SIMCard> findAvailableSIM(String simType) throws SQLException;
+    List<SIMCard> findAllSIMs() throws SQLException;
     boolean updateSIMStatus(int simId, String status) throws SQLException;
 }

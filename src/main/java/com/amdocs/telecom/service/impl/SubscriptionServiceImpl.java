@@ -4,6 +4,9 @@ import com.amdocs.telecom.dao.PlanDAO;
 import com.amdocs.telecom.dao.SubscriptionDAO;
 import com.amdocs.telecom.dao.impl.PlanDAOImpl;
 import com.amdocs.telecom.dao.impl.SubscriptionDAOImpl;
+import com.amdocs.telecom.dao.AuditAndNotificationDAO;
+import com.amdocs.telecom.factory.DAOFactory;
+import com.amdocs.telecom.model.AuditLog;
 import com.amdocs.telecom.exception.TelecomException;
 import com.amdocs.telecom.model.MobileSubscription;
 import com.amdocs.telecom.model.SIMCard;
@@ -24,11 +27,13 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     private final SubscriptionDAO subscriptionDAO;
     private final PlanDAO planDAO;
     private final BillingService billingService;
+    private final AuditAndNotificationDAO auditDAO;
 
     public SubscriptionServiceImpl() {
         this.subscriptionDAO = new SubscriptionDAOImpl();
         this.planDAO = new PlanDAOImpl();
         this.billingService = new BillingServiceImpl();
+        this.auditDAO = DAOFactory.getAuditAndNotificationDAO();
     }
 
     @Override
@@ -77,10 +82,22 @@ public class SubscriptionServiceImpl implements SubscriptionService {
             try {
                 String billingMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
                 billingService.generateMonthlyBill(created.getSubscriptionId(), billingMonth);
-            } catch (Exception ignored) {
-                // If already generated or fails, continue gracefully
+            } catch (TelecomException e) {
+                throw new TelecomException("Subscription was created, but its initial bill could not be generated: " + e.getMessage());
             }
 
+            AuditLog audit = new AuditLog();
+            audit.setEntityName("SUBSCRIPTION");
+            audit.setEntityId(String.valueOf(created.getSubscriptionId()));
+            audit.setAction("CREATED");
+            audit.setDetails("Subscription " + created.getSubscriptionNumber() + " created for customer " + customerId);
+            audit.setPerformedBy(String.valueOf(customerId));
+            try {
+                auditDAO.logAudit(audit);
+            } catch (SQLException auditError) {
+                java.util.logging.Logger.getLogger(SubscriptionServiceImpl.class.getName())
+                        .warning("Subscription created but activity logging failed: " + auditError.getMessage());
+            }
             return created;
         } catch (SQLException e) {
             throw new TelecomException("Database error: " + e.getMessage());
@@ -88,13 +105,17 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     }
 
     @Override
-    public boolean changePlan(int subscriptionId, int newPlanId, String customerUsername) throws TelecomException {
+    public boolean changePlan(int subscriptionId, int newPlanId, int customerId, String changedBy) throws TelecomException {
         try {
             Optional<MobileSubscription> subOpt = subscriptionDAO.findById(subscriptionId);
             if (!subOpt.isPresent()) {
                 throw new TelecomException("Subscription not found.");
             }
             MobileSubscription sub = subOpt.get();
+
+            if (sub.getCustomerId() != customerId) {
+                throw new TelecomException("You are not authorized to change this subscription.");
+            }
 
             if (sub.getPlanId() == newPlanId) {
                 throw new TelecomException("You are already subscribed to this plan.");
@@ -104,12 +125,28 @@ public class SubscriptionServiceImpl implements SubscriptionService {
             if (!newPlanOpt.isPresent() || !"ACTIVE".equals(newPlanOpt.get().getStatus())) {
                 throw new TelecomException("The selected plan is invalid or inactive.");
             }
-            
-            // Note: Add prepaid-postpaid switching validations here if strictly requested.
-            // E.g. TelecomPlan newPlan = newPlanOpt.get();
-            // if(sub.getSubscriptionType() != newPlan.getPlanType()) { throw... }
 
-            return subscriptionDAO.changePlan(subscriptionId, newPlanId, "Customer Request", customerUsername);
+            TelecomPlan newPlan = newPlanOpt.get();
+            if (sub.getSubscriptionType() != newPlan.getPlanType()) {
+                throw new TelecomException("Prepaid and postpaid plan types cannot be switched during a plan change.");
+            }
+
+            boolean changed = subscriptionDAO.changePlan(subscriptionId, newPlanId, "Customer Request", changedBy);
+            if (changed) {
+                AuditLog audit = new AuditLog();
+                audit.setEntityName("SUBSCRIPTION");
+                audit.setEntityId(String.valueOf(subscriptionId));
+                audit.setAction("PLAN_CHANGED");
+                audit.setDetails("Plan changed to " + newPlan.getPlanCode());
+                audit.setPerformedBy(changedBy);
+                try {
+                    auditDAO.logAudit(audit);
+                } catch (SQLException auditError) {
+                    java.util.logging.Logger.getLogger(SubscriptionServiceImpl.class.getName())
+                            .warning("Plan changed but activity logging failed: " + auditError.getMessage());
+                }
+            }
+            return changed;
         } catch (SQLException e) {
             throw new TelecomException("Database error: " + e.getMessage());
         }

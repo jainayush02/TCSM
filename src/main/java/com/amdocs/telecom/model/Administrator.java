@@ -9,6 +9,7 @@ public class Administrator {
     private String passwordHash;
     private String email;
     private String fullName;
+    private String accountStatus;
     private LocalDateTime createdAt;
 
     public Administrator() {}
@@ -41,6 +42,9 @@ public class Administrator {
 
     public String getFullName() { return fullName; }
     public void setFullName(String fullName) { this.fullName = fullName; }
+
+    public String getAccountStatus() { return accountStatus; }
+    public void setAccountStatus(String accountStatus) { this.accountStatus = accountStatus; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

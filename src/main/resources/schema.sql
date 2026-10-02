@@ -29,8 +29,11 @@ CREATE TABLE IF NOT EXISTS administrators (
     password_hash VARCHAR(255) NOT NULL,
     email VARCHAR(100) NOT NULL UNIQUE,
     full_name VARCHAR(100) NOT NULL,
+    account_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE administrators ADD COLUMN IF NOT EXISTS account_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE';
 
 -- 3. Telecom Tariff Plans Table
 CREATE TABLE IF NOT EXISTS telecom_plans (
@@ -119,6 +122,9 @@ CREATE TABLE IF NOT EXISTS bills (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (subscription_id) REFERENCES mobile_subscriptions(subscription_id) ON DELETE CASCADE
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_bill_subscription_month
+    ON bills(subscription_id, billing_month);
 
 -- 9. Payments Table
 CREATE TABLE IF NOT EXISTS payments (

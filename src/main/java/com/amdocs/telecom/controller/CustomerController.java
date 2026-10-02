@@ -8,8 +8,10 @@ import com.amdocs.telecom.security.PasswordUtil;
 import com.amdocs.telecom.validation.ValidationUtil;
 import com.amdocs.telecom.service.*;
 import com.amdocs.telecom.service.impl.*;
+import com.amdocs.telecom.main.MainApplication;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
@@ -39,7 +41,7 @@ public class CustomerController {
         this.planService = new PlanServiceImpl();
         this.subscriptionService = new SubscriptionServiceImpl();
         this.billingService = new BillingServiceImpl();
-        this.paymentService = new PaymentServiceImpl();
+        this.paymentService = new PaymentServiceImpl(MainApplication.getNotificationService());
         this.usageService = new UsageServiceImpl();
         this.complaintService = new ComplaintServiceImpl();
         this.reportGenerator = new com.amdocs.telecom.report.ReportGenerator();
@@ -550,7 +552,8 @@ public class CustomerController {
         if (newPlanId <= 0) return;
 
         try {
-            boolean success = subscriptionService.changePlan(target.getSubscriptionId(), newPlanId, loggedInCustomer.getUsername());
+                boolean success = subscriptionService.changePlan(target.getSubscriptionId(), newPlanId,
+                    loggedInCustomer.getCustomerId(), loggedInCustomer.getUsername());
             if (success) {
                 System.out.println("✅ Plan changed successfully for " + target.getSubscriptionNumber() + " (" + target.getMobileNumber() + ")!");
 
@@ -680,10 +683,28 @@ public class CustomerController {
 
             System.out.print("Enter Card Expiry (MM/YY, e.g. 10/28): ");
             String expiry = scanner.nextLine().trim();
-            if (expiry.isEmpty()) expiry = "12/28";
 
             System.out.print("Enter CVV (3 digits): ");
             String cvv = scanner.nextLine().trim();
+
+            if (!cardNum.matches("\\d{16}")) {
+                System.out.println("❌ Card number must contain exactly 16 digits.");
+                return null;
+            }
+            if (!expiry.matches("(0[1-9]|1[0-2])/\\d{2}")) {
+                System.out.println("❌ Card expiry must use MM/YY format.");
+                return null;
+            }
+            int expiryYear = 2000 + Integer.parseInt(expiry.substring(3));
+            int expiryMonth = Integer.parseInt(expiry.substring(0, 2));
+            if (YearMonth.of(expiryYear, expiryMonth).isBefore(YearMonth.now())) {
+                System.out.println("❌ Card has expired.");
+                return null;
+            }
+            if (!cvv.matches("\\d{3,4}")) {
+                System.out.println("❌ CVV must contain 3 or 4 digits.");
+                return null;
+            }
 
             String maskedCard = (cardNum.length() >= 4)
                     ? "XXXX-XXXX-XXXX-" + cardNum.substring(cardNum.length() - 4)
@@ -721,6 +742,10 @@ public class CustomerController {
             String upiId = scanner.nextLine().trim();
             if (upiId.isEmpty()) {
                 upiId = loggedInCustomer.getUsername() + "@oksbi";
+            }
+            if (!upiId.matches("[A-Za-z0-9._-]+@[A-Za-z0-9.-]+")) {
+                System.out.println("❌ Invalid UPI ID format.");
+                return null;
             }
             paymentInstrumentDetail = "UPI (ID: " + upiId + ")";
             System.out.println("  Sending payment request to UPI ID: " + upiId + " ...");

@@ -60,6 +60,25 @@ public class BillingDAOImpl implements BillingDAO {
     }
 
     @Override
+    public Optional<Bill> findById(Connection conn, int billId) throws SQLException {
+        String sql = "SELECT b.*, ms.mobile_number, ms.customer_id, c.customer_number, " +
+                "CONCAT(c.first_name, ' ', c.last_name) AS customer_name " +
+                "FROM bills b " +
+                "JOIN mobile_subscriptions ms ON b.subscription_id = ms.subscription_id " +
+                "JOIN customers c ON ms.customer_id = c.customer_id " +
+                "WHERE b.bill_id = ? FOR UPDATE";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, billId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapResultSetToBill(rs));
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
     public Optional<Bill> findByNumber(String billNumber) throws SQLException {
         String sql = "SELECT b.*, ms.mobile_number, ms.customer_id, c.customer_number, CONCAT(c.first_name, ' ', c.last_name) as customer_name " +
                 "FROM bills b " +

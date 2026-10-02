@@ -2,8 +2,8 @@
 
 -- 1. Default Admin (Username: admin, Password: admin@123)
 -- BCrypt hash generated at runtime; using a pre-computed hash here
-INSERT INTO administrators (admin_number, username, password_hash, email, full_name)
-SELECT 'ADM1001', 'admin', '$2a$10$In4VlbyKe7FC4DpR.3wnEOg8lCO/31lKQ1ayCTHfWuE4YwTeGkoqW', 'admin@telecom.com', 'System Administrator'
+INSERT INTO administrators (admin_number, username, password_hash, email, full_name, account_status)
+SELECT 'ADM1001', 'admin', '$2a$10$In4VlbyKe7FC4DpR.3wnEOg8lCO/31lKQ1ayCTHfWuE4YwTeGkoqW', 'admin@telecom.com', 'System Administrator', 'ACTIVE'
 WHERE NOT EXISTS (SELECT 1 FROM administrators WHERE username = 'admin');
 
 -- 2. Initial Tariff Plans

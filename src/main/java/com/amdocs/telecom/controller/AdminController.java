@@ -8,6 +8,7 @@ import com.amdocs.telecom.dao.impl.CustomerDAOImpl;
 import com.amdocs.telecom.model.*;
 import com.amdocs.telecom.scheduler.AccountMonitor;
 import com.amdocs.telecom.scheduler.BillingScheduler;
+import com.amdocs.telecom.scheduler.ConsoleActivityMonitor;
 import com.amdocs.telecom.scheduler.UsageProcessor;
 import com.amdocs.telecom.security.CaptchaGenerator;
 import com.amdocs.telecom.security.PasswordUtil;
@@ -36,6 +37,7 @@ public class AdminController {
     private final AuditAndNotificationDAO auditDAO;
     private final com.amdocs.telecom.report.ReportGenerator reportGenerator;
     private final Scanner scanner;
+    private final ConsoleActivityMonitor activityMonitor;
     private Administrator loggedInAdmin;
 
     public AdminController(Scanner scanner) {
@@ -48,6 +50,7 @@ public class AdminController {
         this.complaintService = new ComplaintServiceImpl();
         this.auditDAO = new AuditAndNotificationDAOImpl();
         this.reportGenerator = new com.amdocs.telecom.report.ReportGenerator();
+        this.activityMonitor = new ConsoleActivityMonitor();
     }
 
     public void showLoginMenu() {
@@ -120,8 +123,13 @@ public class AdminController {
 
         try {
             Optional<Administrator> opt = adminDAO.findByUsername(username);
+            if (opt.isPresent() && "LOCKED".equals(opt.get().getAccountStatus())) {
+                System.out.println("❌ Admin account is locked. Use password recovery to unlock it.");
+                return false;
+            }
             if (opt.isPresent() && PasswordUtil.verifyPassword(password, opt.get().getPasswordHash())) {
                 loggedInAdmin = opt.get();
+                adminDAO.updateAccountStatus(loggedInAdmin.getAdminId(), "ACTIVE");
                 System.out.println("\n✅ Admin login successful! Welcome, " + loggedInAdmin.getFullName());
 
                 // Log login
@@ -129,6 +137,14 @@ public class AdminController {
                 return true;
             } else {
                 new CustomerDAOImpl().logLoginAttempt(username, "ADMIN", "127.0.0.1", "FAILED");
+                if (opt.isPresent()) {
+                    int failures = new CustomerDAOImpl().getRecentFailedLoginAttempts(username, 30);
+                    if (failures >= 3) {
+                        adminDAO.updateAccountStatus(opt.get().getAdminId(), "LOCKED");
+                        System.out.println("❌ Maximum 3 failed attempts reached. Admin account locked.");
+                        return false;
+                    }
+                }
                 System.out.println("❌ Invalid admin credentials.");
                 return false;
             }
@@ -161,6 +177,10 @@ public class AdminController {
             System.out.println("║  14. View Audit Logs                 ║");
             System.out.println("║  15. Change My Password              ║");
             System.out.println("║  16. Logout                          ║");
+            System.out.println("║  17. View Payments                   ║");
+            System.out.println("║  18. Reactivate Subscription         ║");
+            System.out.println("║  19. View SIM Inventory              ║");
+            System.out.println("║  20. Toggle Live Activity Monitor    ║");
             System.out.println("╚══════════════════════════════════════╝");
             System.out.print("Select option: ");
             if (!scanner.hasNextLine()) break;
@@ -184,9 +204,14 @@ public class AdminController {
                 case 15 -> handleAdminChangePassword();
                 case 16 -> {
                     System.out.println("Admin logged out.");
+                    activityMonitor.stop();
                     loggedInAdmin = null;
                     running = false;
                 }
+                case 17 -> viewAllPayments();
+                case 18 -> reactivateSubscription();
+                case 19 -> viewSimInventory();
+                case 20 -> toggleLiveActivityMonitor();
                 default -> System.out.println("Invalid option.");
             }
         }
@@ -286,6 +311,61 @@ public class AdminController {
         } catch (SQLException e) {
             System.out.println("❌ Error: " + e.getMessage());
         }
+    }
+
+    private void viewAllPayments() {
+        try {
+            List<Payment> payments = new com.amdocs.telecom.dao.impl.PaymentDAOImpl().findAll();
+            System.out.println("\n┌─── ALL PAYMENTS ────────────────────┐");
+            if (payments.isEmpty()) {
+                System.out.println("  No payments found.");
+            } else {
+                for (Payment payment : payments) {
+                    System.out.printf("  #%d | %s | Bill: %d | Customer: %d | ₹%.2f | %s | %s%n",
+                            payment.getPaymentId(), payment.getTransactionReference(), payment.getBillId(),
+                            payment.getCustomerId(), payment.getAmount(), payment.getPaymentMode(),
+                            payment.getPaymentStatus());
+                }
+            }
+            System.out.println("└──────────────────────────────────────┘");
+        } catch (SQLException e) {
+            System.out.println("❌ Error: " + e.getMessage());
+        }
+    }
+
+    private void reactivateSubscription() {
+        System.out.print("Enter Subscription ID to reactivate (or 0 to cancel): ");
+        int subscriptionId = readInt();
+        if (subscriptionId <= 0) return;
+
+        try {
+            boolean updated = new com.amdocs.telecom.dao.impl.SubscriptionDAOImpl()
+                    .updateStatus(subscriptionId, "ACTIVE");
+            System.out.println(updated
+                    ? "✅ Subscription reactivated."
+                    : "❌ Subscription was not found.");
+        } catch (SQLException e) {
+            System.out.println("❌ Error: " + e.getMessage());
+        }
+    }
+
+    private void viewSimInventory() {
+        try {
+            List<SIMCard> sims = new com.amdocs.telecom.dao.impl.SubscriptionDAOImpl().findAllSIMs();
+            System.out.println("\n┌─── SIM INVENTORY ───────────────────┐");
+            for (SIMCard sim : sims) {
+                System.out.printf("  #%d | %s | Type: %s | IMSI: %s | Status: %s%n",
+                        sim.getSimId(), sim.getSimNumber(), sim.getSimType(), sim.getImsi(), sim.getStatus());
+            }
+            System.out.println("  Total SIMs: " + sims.size());
+            System.out.println("└──────────────────────────────────────┘");
+        } catch (SQLException e) {
+            System.out.println("❌ Error: " + e.getMessage());
+        }
+    }
+
+    private void toggleLiveActivityMonitor() {
+        activityMonitor.toggle();
     }
 
     private void generateBillingCycle() {
@@ -754,6 +834,7 @@ public class AdminController {
                 String hashed = PasswordUtil.hashPassword(newPass);
                 boolean updated = adminDAO.updatePassword(admin.getAdminId(), hashed);
                 if (updated) {
+                    adminDAO.updateAccountStatus(admin.getAdminId(), "ACTIVE");
                     System.out.println("✅ Admin password reset successfully! Please login with your new password.");
                     // Audit log
                     AuditLog audit = new AuditLog();

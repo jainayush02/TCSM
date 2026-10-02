@@ -46,6 +46,7 @@ C:\Users\Admin\OneDrive\Documents\amdocs\src\main\java\com\amdocs\telecom\model\
 C:\Users\Admin\OneDrive\Documents\amdocs\src\main\java\com\amdocs\telecom\report\ReportGenerator.java
 C:\Users\Admin\OneDrive\Documents\amdocs\src\main\java\com\amdocs\telecom\scheduler\AccountMonitor.java
 C:\Users\Admin\OneDrive\Documents\amdocs\src\main\java\com\amdocs\telecom\scheduler\BillingScheduler.java
+C:\Users\Admin\OneDrive\Documents\amdocs\src\main\java\com\amdocs\telecom\scheduler\ConsoleActivityMonitor.java
 C:\Users\Admin\OneDrive\Documents\amdocs\src\main\java\com\amdocs\telecom\scheduler\PaymentNotificationService.java
 C:\Users\Admin\OneDrive\Documents\amdocs\src\main\java\com\amdocs\telecom\scheduler\UsageProcessor.java
 C:\Users\Admin\OneDrive\Documents\amdocs\src\main\java\com\amdocs\telecom\security\CaptchaGenerator.java

@@ -2,7 +2,10 @@ package com.amdocs.telecom.service.impl;
 
 import com.amdocs.telecom.dao.CustomerDAO;
 import com.amdocs.telecom.dao.impl.CustomerDAOImpl;
+import com.amdocs.telecom.dao.AuditAndNotificationDAO;
+import com.amdocs.telecom.factory.DAOFactory;
 import com.amdocs.telecom.exception.AuthenticationException;
+import com.amdocs.telecom.model.AuditLog;
 import com.amdocs.telecom.model.Customer;
 import com.amdocs.telecom.security.CaptchaGenerator;
 import com.amdocs.telecom.security.OTPService;
@@ -15,9 +18,11 @@ import java.util.Optional;
 public class AuthenticationServiceImpl implements AuthenticationService {
 
     private final CustomerDAO customerDAO;
+    private final AuditAndNotificationDAO auditDAO;
 
     public AuthenticationServiceImpl() {
         this.customerDAO = new CustomerDAOImpl();
+        this.auditDAO = DAOFactory.getAuditAndNotificationDAO();
     }
 
     @Override
@@ -30,17 +35,20 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             Optional<Customer> optionalCustomer = customerDAO.findByUsernameOrEmail(username);
             if (!optionalCustomer.isPresent()) {
                 customerDAO.logLoginAttempt(username, "CUSTOMER", "127.0.0.1", "FAILED");
+                logActivity(username, "LOGIN_FAILED", "Unknown customer login attempt");
                 throw new AuthenticationException("Invalid credentials.");
             }
 
             Customer customer = optionalCustomer.get();
 
             if ("LOCKED".equals(customer.getAccountStatus())) {
+                logActivity(username, "LOGIN_BLOCKED", "Customer account is locked");
                 throw new AuthenticationException("Account is temporarily locked due to multiple failed attempts. Please reset password.");
             }
 
             if (!PasswordUtil.verifyPassword(password, customer.getPasswordHash())) {
                 customerDAO.logLoginAttempt(username, "CUSTOMER", "127.0.0.1", "FAILED");
+                logActivity(username, "LOGIN_FAILED", "Invalid customer password");
                 
                 int failedAttempts = customerDAO.getRecentFailedLoginAttempts(username, 30); // check last 30 mins
                 if (failedAttempts >= 3) {
@@ -51,6 +59,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             }
 
             customerDAO.logLoginAttempt(username, "CUSTOMER", "127.0.0.1", "SUCCESS");
+            logActivity(username, "LOGIN_SUCCESS", "Customer login successful");
             
             // Reset status if it was active but had previous failures (not locked)
             if (!"ACTIVE".equals(customer.getAccountStatus())) {
@@ -107,5 +116,18 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     public void logout(String username) {
         // Handle session logout logic if applicable. 
         // For console, returning to main menu acts as logout.
+    }
+
+    private void logActivity(String username, String action, String details) {
+        try {
+            AuditLog audit = new AuditLog();
+            audit.setEntityName("AUTHENTICATION");
+            audit.setEntityId(username);
+            audit.setAction(action);
+            audit.setDetails(details);
+            audit.setPerformedBy(username);
+            auditDAO.logAudit(audit);
+        } catch (SQLException ignored) {
+        }
     }
 }

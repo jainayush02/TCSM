@@ -23,8 +23,8 @@ public class MainApplication {
         rootLogger.setLevel(java.util.logging.Level.WARNING);
 
         // Initialize Database (Schema + Seed Data)
-        DBConnection.getInstance();
-        System.out.println("Database initialized successfully.");
+        DBConnection database = DBConnection.getInstance();
+        System.out.println("Database initialized successfully: " + database.getActiveDatabaseName());
 
         // Start background notification service
         notificationService = new PaymentNotificationService();

@@ -102,7 +102,7 @@ com.amdocs.telecom
 ## 🚀 How to Build and Run
 
 ### Prerequisites
-- **Java JDK 17+** (JDK 21 or 24 recommended).
+- **Java JDK 17+** (the project is compiled for Java 17 and uses Java 8 Stream/functional APIs).
 - *Optional*: MySQL Server running on `localhost:3306` (The system automatically falls back to an embedded H2 database if MySQL is offline).
 
 ### Quick Start (Windows)
@@ -117,6 +117,29 @@ The script will automatically:
 3. Copy schema and database scripts.
 4. Set console encoding to UTF-8 (`chcp 65001`) for crisp UI rendering.
 5. Launch the application.
+## Two-Terminal Live Demonstration
+
+The console application can be run in multiple terminals against the same localhost database.
+
+1. Open Terminal 1 and run `run.bat`.
+2. Login as administrator and select option `20. Toggle Live Activity Monitor`.
+3. Open Terminal 2 in the same project folder and run `run.bat` again.
+4. Login as a customer and register, subscribe, change plans, record usage, raise a complaint, or make a payment.
+5. The administrator terminal displays new activity events from the shared `audit_logs` table every two seconds.
+
+This remains a console-only workflow. When MySQL is unavailable, both processes use the file-backed H2 database configured with `AUTO_SERVER=TRUE`.
+
+The application prints the active database at startup. The included local `.env` file is loaded automatically by `run.bat` and contains the MySQL connection settings. Do not commit `.env`; it is ignored by Git. To use a different password, update `.env` before running the batch file:
+
+PowerShell:
+
+```powershell
+$env:TCSMS_DB_USER = "root"
+$env:TCSMS_DB_PASSWORD = "<your-local-mysql-password>"
+.\run.bat
+```
+
+Both terminals must show `Database initialized successfully: MySQL`. If either terminal shows `H2`, it is not connected to the MySQL data visible in Workbench.
 
 ---
 
@@ -124,11 +147,11 @@ The script will automatically:
 
 ### 1. Administrator Portal
 - **Username**: `admin`
-- **Password**: `admin123`
+- **Password**: `admin@123`
 
 ### 2. Pre-seeded Customers
 | Customer Number | Name | Username | Password | Mobile | City |
 |---|---|---|---|---|---|
-| `CUST100245` | Arjun Mehta | `arjun_m` | `Pass@123` | `+91-9876543210` | Mumbai |
-| `CUST100378` | Sarah Wilson | `sarah_w` | `Pass@123` | `+44-7700900123` | London |
-| `CUST100412` | Omar Hassan | `omar_h` | `Pass@123` | `+966-501234567` | Riyadh |
+| `CUST100245` | Arjun Mehta | `arjunm` | `Customer@123` | `9876543210` | Mumbai |
+| `CUST100378` | Sarah Wilson | `sarahw` | `Customer@123` | `9876543211` | London |
+| `CUST100412` | Omar Hassan | `omarh` | `Customer@123` | `9876543212` | Riyadh |

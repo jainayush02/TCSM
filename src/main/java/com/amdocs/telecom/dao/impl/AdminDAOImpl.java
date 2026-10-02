@@ -24,6 +24,7 @@ public class AdminDAOImpl implements AdminDAO {
                     admin.setPasswordHash(rs.getString("password_hash"));
                     admin.setEmail(rs.getString("email"));
                     admin.setFullName(rs.getString("full_name"));
+                    admin.setAccountStatus(rs.getString("account_status"));
                     Timestamp ts = rs.getTimestamp("created_at");
                     if (ts != null) admin.setCreatedAt(ts.toLocalDateTime());
                     return Optional.of(admin);
@@ -39,6 +40,17 @@ public class AdminDAOImpl implements AdminDAO {
         try (Connection conn = DBConnection.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, newPasswordHash);
+            ps.setInt(2, adminId);
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    @Override
+    public boolean updateAccountStatus(int adminId, String status) throws SQLException {
+        String sql = "UPDATE administrators SET account_status = ? WHERE admin_id = ?";
+        try (Connection conn = DBConnection.getInstance().getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, status);
             ps.setInt(2, adminId);
             return ps.executeUpdate() > 0;
         }

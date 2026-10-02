@@ -2,6 +2,9 @@ package com.amdocs.telecom.service.impl;
 
 import com.amdocs.telecom.dao.CustomerDAO;
 import com.amdocs.telecom.dao.impl.CustomerDAOImpl;
+import com.amdocs.telecom.dao.AuditAndNotificationDAO;
+import com.amdocs.telecom.factory.DAOFactory;
+import com.amdocs.telecom.model.AuditLog;
 import com.amdocs.telecom.dto.CustomerRegistrationDTO;
 import com.amdocs.telecom.exception.ValidationException;
 import com.amdocs.telecom.model.Customer;
@@ -18,9 +21,11 @@ import java.util.logging.Logger;
 public class CustomerServiceImpl implements CustomerService {
     private static final Logger LOGGER = Logger.getLogger(CustomerServiceImpl.class.getName());
     private final CustomerDAO customerDAO;
+    private final AuditAndNotificationDAO auditDAO;
 
     public CustomerServiceImpl() {
         this.customerDAO = new CustomerDAOImpl();
+        this.auditDAO = DAOFactory.getAuditAndNotificationDAO();
     }
 
     @Override
@@ -67,7 +72,19 @@ public class CustomerServiceImpl implements CustomerService {
             customer.setPasswordHash(PasswordUtil.hashPassword(dto.getPassword()));
             customer.setAccountStatus("ACTIVE");
 
-            return customerDAO.save(customer);
+            Customer saved = customerDAO.save(customer);
+            AuditLog audit = new AuditLog();
+            audit.setEntityName("CUSTOMER");
+            audit.setEntityId(String.valueOf(saved.getCustomerId()));
+            audit.setAction("REGISTERED");
+            audit.setDetails("Customer account registered: " + saved.getCustomerNumber());
+            audit.setPerformedBy(saved.getUsername());
+            try {
+                auditDAO.logAudit(audit);
+            } catch (SQLException auditError) {
+                LOGGER.log(Level.WARNING, "Customer registered but activity logging failed", auditError);
+            }
+            return saved;
 
         } catch (SQLException e) {
             LOGGER.log(Level.SEVERE, "Database error during registration", e);

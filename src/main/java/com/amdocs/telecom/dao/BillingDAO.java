@@ -8,6 +8,7 @@ import java.util.Optional;
 public interface BillingDAO {
     Bill save(Bill bill) throws SQLException;
     Optional<Bill> findById(int billId) throws SQLException;
+    Optional<Bill> findById(java.sql.Connection conn, int billId) throws SQLException;
     Optional<Bill> findByNumber(String billNumber) throws SQLException;
     Optional<Bill> findBySubscriptionAndMonth(int subscriptionId, String billingMonth) throws SQLException;
     List<Bill> findBySubscriptionId(int subscriptionId) throws SQLException;

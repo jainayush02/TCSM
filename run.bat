@@ -7,6 +7,12 @@ echo ============================================
 
 cd /d "%~dp0"
 
+if exist ".env" (
+    for /f "usebackq tokens=1,* delims==" %%A in (".env") do (
+        if not "%%A"=="" if not "%%A:~0,1%%"=="#" set "%%A=%%B"
+    )
+)
+
 set SRC_DIR=src\main\java
 set RES_DIR=src\main\resources
 set OUT_DIR=target\classes

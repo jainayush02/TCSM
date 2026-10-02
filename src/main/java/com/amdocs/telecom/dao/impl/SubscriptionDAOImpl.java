@@ -275,6 +275,26 @@ public class SubscriptionDAOImpl implements SubscriptionDAO {
     }
 
     @Override
+    public List<SIMCard> findAllSIMs() throws SQLException {
+        List<SIMCard> sims = new ArrayList<>();
+        String sql = "SELECT * FROM sim_cards ORDER BY sim_id";
+        try (Connection conn = DBConnection.getInstance().getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                SIMCard sim = new SIMCard();
+                sim.setSimId(rs.getInt("sim_id"));
+                sim.setSimNumber(rs.getString("sim_number"));
+                sim.setSimType(SimType.valueOf(rs.getString("sim_type")));
+                sim.setImsi(rs.getString("imsi"));
+                sim.setStatus(rs.getString("status"));
+                sims.add(sim);
+            }
+        }
+        return sims;
+    }
+
+    @Override
     public boolean updateSIMStatus(int simId, String status) throws SQLException {
         String sql = "UPDATE sim_cards SET status = ? WHERE sim_id = ?";
         try (Connection conn = DBConnection.getInstance().getConnection();
