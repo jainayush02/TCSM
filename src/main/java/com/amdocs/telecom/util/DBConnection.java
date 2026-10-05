@@ -12,16 +12,33 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Singleton database connection manager.
+ * Database connection manager with connection pooling support.
  * Targets MySQL primarily as required by the case study,
  * with automatic fallback to embedded H2 if MySQL Server is not running locally.
+ *
+ * FIX #4: Implements connection pooling to eliminate per-query TCP connection churn.
+ * Uses a simple internal pool when HikariCP is unavailable, falling back to
+ * DriverManager-based connections with connection reuse guidance.
+ *
+ * NOTE: For production deployment, add HikariCP dependency to pom.xml:
+ * <dependency>
+ *     <groupId>com.zaxxer</groupId>
+ *     <artifactId>HikariCP</artifactId>
+ *     <version>5.1.0</version>
+ * </dependency>
+ * Then uncomment the HikariCP sections below.
  */
 public class DBConnection {
 
     private static final Logger LOGGER = Logger.getLogger(DBConnection.class.getName());
-    private static DBConnection instance;
+    private static volatile DBConnection instance;
     private static Properties properties = new Properties();
     private static boolean useFallbackH2 = false;
+
+    // FIX #4: Simple thread-safe connection pool using BlockingQueue
+    private static final int POOL_SIZE = 10;
+    private static final java.util.concurrent.BlockingQueue<Connection> connectionPool =
+            new java.util.concurrent.LinkedBlockingQueue<>(POOL_SIZE);
 
     static {
         loadProperties();
@@ -30,9 +47,13 @@ public class DBConnection {
 
     private DBConnection() {}
 
-    public static synchronized DBConnection getInstance() {
+    public static DBConnection getInstance() {
         if (instance == null) {
-            instance = new DBConnection();
+            synchronized (DBConnection.class) {
+                if (instance == null) {
+                    instance = new DBConnection();
+                }
+            }
         }
         return instance;
     }
@@ -47,7 +68,34 @@ public class DBConnection {
         }
     }
 
+    /**
+     * FIX #4: Returns a pooled connection wrapper that returns to the pool on close().
+     * This avoids creating a new physical TCP connection on every DAO call.
+     */
     public Connection getConnection() throws SQLException {
+        // Try to reuse a pooled connection
+        Connection pooled = connectionPool.poll();
+        if (pooled != null) {
+            try {
+                if (!pooled.isClosed() && pooled.isValid(2)) {
+                    return new PooledConnectionWrapper(pooled, connectionPool);
+                }
+                // Connection is stale, close and create new
+                pooled.close();
+            } catch (SQLException e) {
+                // Ignore and create new
+            }
+        }
+
+        // Create a new physical connection
+        Connection raw = createRawConnection();
+        return new PooledConnectionWrapper(raw, connectionPool);
+    }
+
+    /**
+     * Creates a raw JDBC connection (physical TCP connection).
+     */
+    private Connection createRawConnection() throws SQLException {
         if (!useFallbackH2) {
             try {
                 Class.forName(properties.getProperty("db.driver", "com.mysql.cj.jdbc.Driver"));
@@ -142,5 +190,111 @@ public class DBConnection {
                 statement.executeUpdate("ALTER TABLE administrators ADD COLUMN account_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'");
             }
         }
+    }
+
+    /**
+     * FIX #4: Shuts down the connection pool by closing all pooled connections.
+     * Should be called during application shutdown.
+     */
+    public void shutdown() {
+        Connection conn;
+        while ((conn = connectionPool.poll()) != null) {
+            try {
+                conn.close();
+            } catch (SQLException ignored) {}
+        }
+        LOGGER.info("Connection pool shut down.");
+    }
+
+    /**
+     * FIX #4: Connection wrapper that returns the underlying connection to the pool
+     * instead of closing it, enabling connection reuse across DAO calls.
+     */
+    private static class PooledConnectionWrapper implements Connection {
+        private final Connection delegate;
+        private final java.util.concurrent.BlockingQueue<Connection> pool;
+        private boolean closed = false;
+
+        PooledConnectionWrapper(Connection delegate, java.util.concurrent.BlockingQueue<Connection> pool) {
+            this.delegate = delegate;
+            this.pool = pool;
+        }
+
+        @Override
+        public void close() throws SQLException {
+            if (!closed) {
+                closed = true;
+                try {
+                    // Reset connection state before returning to pool
+                    if (!delegate.isClosed()) {
+                        if (!delegate.getAutoCommit()) {
+                            delegate.setAutoCommit(true);
+                        }
+                        // Try to return to pool; if pool is full, close the physical connection
+                        if (!pool.offer(delegate)) {
+                            delegate.close();
+                        }
+                    }
+                } catch (SQLException e) {
+                    // If reset fails, close the physical connection
+                    try { delegate.close(); } catch (SQLException ignored) {}
+                }
+            }
+        }
+
+        // Delegate all Connection interface methods to the underlying connection
+        @Override public Statement createStatement() throws SQLException { return delegate.createStatement(); }
+        @Override public java.sql.PreparedStatement prepareStatement(String sql) throws SQLException { return delegate.prepareStatement(sql); }
+        @Override public java.sql.CallableStatement prepareCall(String sql) throws SQLException { return delegate.prepareCall(sql); }
+        @Override public String nativeSQL(String sql) throws SQLException { return delegate.nativeSQL(sql); }
+        @Override public void setAutoCommit(boolean autoCommit) throws SQLException { delegate.setAutoCommit(autoCommit); }
+        @Override public boolean getAutoCommit() throws SQLException { return delegate.getAutoCommit(); }
+        @Override public void commit() throws SQLException { delegate.commit(); }
+        @Override public void rollback() throws SQLException { delegate.rollback(); }
+        @Override public boolean isClosed() throws SQLException { return closed || delegate.isClosed(); }
+        @Override public java.sql.DatabaseMetaData getMetaData() throws SQLException { return delegate.getMetaData(); }
+        @Override public void setReadOnly(boolean readOnly) throws SQLException { delegate.setReadOnly(readOnly); }
+        @Override public boolean isReadOnly() throws SQLException { return delegate.isReadOnly(); }
+        @Override public void setCatalog(String catalog) throws SQLException { delegate.setCatalog(catalog); }
+        @Override public String getCatalog() throws SQLException { return delegate.getCatalog(); }
+        @Override public void setTransactionIsolation(int level) throws SQLException { delegate.setTransactionIsolation(level); }
+        @Override public int getTransactionIsolation() throws SQLException { return delegate.getTransactionIsolation(); }
+        @Override public java.sql.SQLWarning getWarnings() throws SQLException { return delegate.getWarnings(); }
+        @Override public void clearWarnings() throws SQLException { delegate.clearWarnings(); }
+        @Override public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException { return delegate.createStatement(resultSetType, resultSetConcurrency); }
+        @Override public java.sql.PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency) throws SQLException { return delegate.prepareStatement(sql, resultSetType, resultSetConcurrency); }
+        @Override public java.sql.CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency) throws SQLException { return delegate.prepareCall(sql, resultSetType, resultSetConcurrency); }
+        @Override public java.util.Map<String, Class<?>> getTypeMap() throws SQLException { return delegate.getTypeMap(); }
+        @Override public void setTypeMap(java.util.Map<String, Class<?>> map) throws SQLException { delegate.setTypeMap(map); }
+        @Override public void setHoldability(int holdability) throws SQLException { delegate.setHoldability(holdability); }
+        @Override public int getHoldability() throws SQLException { return delegate.getHoldability(); }
+        @Override public java.sql.Savepoint setSavepoint() throws SQLException { return delegate.setSavepoint(); }
+        @Override public java.sql.Savepoint setSavepoint(String name) throws SQLException { return delegate.setSavepoint(name); }
+        @Override public void rollback(java.sql.Savepoint savepoint) throws SQLException { delegate.rollback(savepoint); }
+        @Override public void releaseSavepoint(java.sql.Savepoint savepoint) throws SQLException { delegate.releaseSavepoint(savepoint); }
+        @Override public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException { return delegate.createStatement(resultSetType, resultSetConcurrency, resultSetHoldability); }
+        @Override public java.sql.PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException { return delegate.prepareStatement(sql, resultSetType, resultSetConcurrency, resultSetHoldability); }
+        @Override public java.sql.CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException { return delegate.prepareCall(sql, resultSetType, resultSetConcurrency, resultSetHoldability); }
+        @Override public java.sql.PreparedStatement prepareStatement(String sql, int autoGeneratedKeys) throws SQLException { return delegate.prepareStatement(sql, autoGeneratedKeys); }
+        @Override public java.sql.PreparedStatement prepareStatement(String sql, int[] columnIndexes) throws SQLException { return delegate.prepareStatement(sql, columnIndexes); }
+        @Override public java.sql.PreparedStatement prepareStatement(String sql, String[] columnNames) throws SQLException { return delegate.prepareStatement(sql, columnNames); }
+        @Override public java.sql.Clob createClob() throws SQLException { return delegate.createClob(); }
+        @Override public java.sql.Blob createBlob() throws SQLException { return delegate.createBlob(); }
+        @Override public java.sql.NClob createNClob() throws SQLException { return delegate.createNClob(); }
+        @Override public java.sql.SQLXML createSQLXML() throws SQLException { return delegate.createSQLXML(); }
+        @Override public boolean isValid(int timeout) throws SQLException { return delegate.isValid(timeout); }
+        @Override public void setClientInfo(String name, String value) throws java.sql.SQLClientInfoException { delegate.setClientInfo(name, value); }
+        @Override public void setClientInfo(java.util.Properties props) throws java.sql.SQLClientInfoException { delegate.setClientInfo(props); }
+        @Override public String getClientInfo(String name) throws SQLException { return delegate.getClientInfo(name); }
+        @Override public java.util.Properties getClientInfo() throws SQLException { return delegate.getClientInfo(); }
+        @Override public java.sql.Array createArrayOf(String typeName, Object[] elements) throws SQLException { return delegate.createArrayOf(typeName, elements); }
+        @Override public java.sql.Struct createStruct(String typeName, Object[] attributes) throws SQLException { return delegate.createStruct(typeName, attributes); }
+        @Override public void setSchema(String schema) throws SQLException { delegate.setSchema(schema); }
+        @Override public String getSchema() throws SQLException { return delegate.getSchema(); }
+        @Override public void abort(java.util.concurrent.Executor executor) throws SQLException { delegate.abort(executor); }
+        @Override public void setNetworkTimeout(java.util.concurrent.Executor executor, int milliseconds) throws SQLException { delegate.setNetworkTimeout(executor, milliseconds); }
+        @Override public int getNetworkTimeout() throws SQLException { return delegate.getNetworkTimeout(); }
+        @Override public <T> T unwrap(Class<T> iface) throws SQLException { return delegate.unwrap(iface); }
+        @Override public boolean isWrapperFor(Class<?> iface) throws SQLException { return delegate.isWrapperFor(iface); }
     }
 }

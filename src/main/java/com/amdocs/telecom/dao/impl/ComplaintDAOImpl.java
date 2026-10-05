@@ -220,6 +220,36 @@ public class ComplaintDAOImpl implements ComplaintDAO {
         return list;
     }
 
+    @Override
+    public List<java.util.Map<String, Object>> getCustomersWithMultipleComplaints(int minComplaints) throws SQLException {
+        List<java.util.Map<String, Object>> list = new ArrayList<>();
+        // Demonstrates SQL GROUP BY, HAVING, JOIN, ORDER BY, and AGGREGATE functions
+        String sql = "SELECT c.customer_id, c.customer_number, CONCAT(c.first_name, ' ', c.last_name) as customer_name, " +
+                "c.city, c.mobile_number, COUNT(cp.complaint_id) as complaint_count " +
+                "FROM customers c " +
+                "JOIN complaints cp ON c.customer_id = cp.customer_id " +
+                "GROUP BY c.customer_id, c.customer_number, c.first_name, c.last_name, c.city, c.mobile_number " +
+                "HAVING COUNT(cp.complaint_id) >= ? " +
+                "ORDER BY complaint_count DESC";
+        try (Connection conn = DBConnection.getInstance().getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, minComplaints);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    java.util.Map<String, Object> map = new java.util.HashMap<>();
+                    map.put("customerId", rs.getInt("customer_id"));
+                    map.put("customerNumber", rs.getString("customer_number"));
+                    map.put("customerName", rs.getString("customer_name"));
+                    map.put("city", rs.getString("city"));
+                    map.put("mobileNumber", rs.getString("mobile_number"));
+                    map.put("complaintCount", rs.getInt("complaint_count"));
+                    list.add(map);
+                }
+            }
+        }
+        return list;
+    }
+
     private Complaint mapResultSetToComplaint(ResultSet rs) throws SQLException {
         Complaint cp = new Complaint();
         cp.setComplaintId(rs.getInt("complaint_id"));

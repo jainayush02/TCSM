@@ -30,6 +30,13 @@ public class MainApplication {
         notificationService = new PaymentNotificationService();
         notificationService.start();
 
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("JVM shutdown intercepted. Stopping background services...");
+            if (notificationService != null) {
+                notificationService.shutdown();
+            }
+        }));
+
         Scanner scanner = new Scanner(System.in);
         boolean running = true;
 

@@ -34,6 +34,7 @@ public class UsageServiceImpl implements UsageService {
         this.auditDAO = DAOFactory.getAuditAndNotificationDAO();
     }
 
+    // FIX #2: Method now throws TelecomException instead of returning null on failure
     @Override
     public UsageRecord recordUsage(int subscriptionId, String usageTypeStr, double quantity, String unit) {
         if (quantity <= 0) {
@@ -69,9 +70,12 @@ public class UsageServiceImpl implements UsageService {
                 LOGGER.log(Level.WARNING, "Usage recorded but activity logging failed", auditError);
             }
             return saved;
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Invalid usage type: " + usageTypeStr, e);
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "Error recording usage", e);
-            return null;
+            // FIX #2: Do NOT return null — throw with root cause preserved for proper upstream handling
+            LOGGER.log(Level.SEVERE, "Database error recording usage for subscription: " + subscriptionId, e);
+            throw new RuntimeException("Failed to record usage due to a database error. Please retry.", e);
         }
     }
 
@@ -85,6 +89,7 @@ public class UsageServiceImpl implements UsageService {
             }
         } catch (SQLException e) {
             LOGGER.log(Level.SEVERE, "Error fetching customer usage", e);
+            throw new RuntimeException("Failed to fetch customer usage history.", e);
         }
         return allUsage;
     }
@@ -95,7 +100,7 @@ public class UsageServiceImpl implements UsageService {
             return usageDAO.findBySubscriptionId(subscriptionId);
         } catch (SQLException e) {
             LOGGER.log(Level.SEVERE, "Error fetching subscription usage", e);
-            return List.of();
+            throw new RuntimeException("Failed to fetch subscription usage.", e);
         }
     }
 
@@ -109,7 +114,9 @@ public class UsageServiceImpl implements UsageService {
             }
         } catch (SQLException e) {
             LOGGER.log(Level.SEVERE, "Error fetching usage summary", e);
+            throw new RuntimeException("Failed to fetch usage summary.", e);
         }
         return result;
     }
 }
+

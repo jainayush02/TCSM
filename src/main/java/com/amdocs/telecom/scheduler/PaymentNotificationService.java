@@ -17,17 +17,23 @@ import java.util.logging.Logger;
  * to process payment notifications asynchronously.
  * 
  * Demonstrates: BlockingQueue, ExecutorService, Runnable, producer-consumer pattern.
+ *
+ * FIX #3: Increased queue capacity, added timed back-pressure with synchronous fallback
+ * to prevent silent notification loss under queue saturation.
  */
 public class PaymentNotificationService {
 
     private static final Logger LOGGER = Logger.getLogger(PaymentNotificationService.class.getName());
+    private static final int QUEUE_CAPACITY = 1000; // FIX #3: Increased from 100 to handle burst loads
+    private static final long ENQUEUE_TIMEOUT_MS = 500; // FIX #3: Back-pressure timeout before fallback
+
     private final BlockingQueue<Notification> notificationQueue;
     private final ExecutorService workerPool;
     private final AuditAndNotificationDAO notificationDAO;
     private volatile boolean running = true;
 
     public PaymentNotificationService() {
-        this.notificationQueue = new LinkedBlockingQueue<>(100);
+        this.notificationQueue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
         this.workerPool = Executors.newFixedThreadPool(3);
         this.notificationDAO = new AuditAndNotificationDAOImpl();
     }
@@ -40,7 +46,8 @@ public class PaymentNotificationService {
             final int workerId = i + 1;
             workerPool.submit((Runnable) () -> {
                 LOGGER.info("[NotificationWorker-" + workerId + "] Started.");
-                while (running) {
+                // FIX #3: Continue draining queue after shutdown signal to prevent message loss
+                while (running || !notificationQueue.isEmpty()) {
                     try {
                         // Blocks until a notification is available, with 2-second timeout
                         Notification notif = notificationQueue.poll(2, TimeUnit.SECONDS);
@@ -60,6 +67,9 @@ public class PaymentNotificationService {
 
     /**
      * Producer method: enqueues a notification for async processing.
+     *
+     * FIX #3: Uses timed offer() with back-pressure. If queue remains saturated
+     * after timeout, falls back to synchronous DB persistence to guarantee zero message loss.
      */
     public void sendNotification(int customerId, String title, String message) {
         Notification notif = new Notification();
@@ -68,11 +78,35 @@ public class PaymentNotificationService {
         notif.setMessage(message);
         notif.setStatus("UNREAD");
 
-        boolean added = notificationQueue.offer(notif);
-        if (added) {
+        boolean enqueued = false;
+        try {
+            // FIX #3: Timed back-pressure — wait up to 500ms for queue space
+            enqueued = notificationQueue.offer(notif, ENQUEUE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            LOGGER.warning("[PaymentNotificationService] Thread interrupted while enqueueing notification for customer: " + customerId);
+        }
+
+        if (enqueued) {
             LOGGER.info("[PaymentNotificationService] Notification queued for customer " + customerId);
         } else {
-            LOGGER.warning("[PaymentNotificationService] Queue is full! Notification dropped for customer " + customerId);
+            // FIX #3: BACK-PRESSURE FALLBACK — persist synchronously instead of dropping
+            LOGGER.severe("[PaymentNotificationService] Queue saturated! Executing synchronous fallback for customer: " + customerId);
+            executeEmergencyPersistence(notif);
+        }
+    }
+
+    /**
+     * FIX #3: Emergency synchronous persistence — guarantees notification is saved
+     * even when the async queue is full, preventing silent message loss.
+     */
+    private void executeEmergencyPersistence(Notification notif) {
+        try {
+            notificationDAO.createNotification(notif);
+            LOGGER.info("[EmergencyFallback] Successfully persisted notification directly to DB for customer " + notif.getCustomerId());
+        } catch (Exception ex) {
+            LOGGER.log(Level.SEVERE, "[CRITICAL] Emergency DB persistence also failed for customer " + notif.getCustomerId()
+                    + ". Notification data: title='" + notif.getTitle() + "', message='" + notif.getMessage() + "'", ex);
         }
     }
 

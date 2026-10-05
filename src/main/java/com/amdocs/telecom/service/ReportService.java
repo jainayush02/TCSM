@@ -10,4 +10,7 @@ public interface ReportService {
     Map<String, List<Customer>> getCustomersByCity();
     Map<String, DoubleSummaryStatistics> getRevenueSummaryByPlan();
     double getAverageMonthlyRevenuePerCustomer();
+    List<Map<String, Object>> getMostSubscribedPlans();
+    List<Customer> getCustomersWithUnpaidBills();
+    Map<String, Double> getOverallUsageByType();
 }

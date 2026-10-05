@@ -59,23 +59,63 @@ public class BillingDAOImpl implements BillingDAO {
         return Optional.empty();
     }
 
+    /**
+     * FIX #5: Split FOR UPDATE query to avoid multi-table lock escalation.
+     * Step 1: Lock ONLY the bill row in the 'bills' table.
+     * Step 2: Fetch joined display fields (customer name, mobile number) with a regular SELECT.
+     * This prevents deadlocks caused by concurrent transactions locking customers/subscriptions.
+     */
     @Override
     public Optional<Bill> findById(Connection conn, int billId) throws SQLException {
-        String sql = "SELECT b.*, ms.mobile_number, ms.customer_id, c.customer_number, " +
-                "CONCAT(c.first_name, ' ', c.last_name) AS customer_name " +
-                "FROM bills b " +
-                "JOIN mobile_subscriptions ms ON b.subscription_id = ms.subscription_id " +
-                "JOIN customers c ON ms.customer_id = c.customer_id " +
-                "WHERE b.bill_id = ? FOR UPDATE";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        // Step 1: Lock only the bill row — single-table lock, no join
+        String lockSql = "SELECT * FROM bills WHERE bill_id = ? FOR UPDATE";
+        Bill bill = null;
+        try (PreparedStatement ps = conn.prepareStatement(lockSql)) {
             ps.setInt(1, billId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return Optional.of(mapResultSetToBill(rs));
+                    bill = new Bill();
+                    bill.setBillId(rs.getInt("bill_id"));
+                    bill.setBillNumber(rs.getString("bill_number"));
+                    bill.setSubscriptionId(rs.getInt("subscription_id"));
+                    bill.setBillingMonth(rs.getString("billing_month"));
+                    bill.setPlanRental(rs.getDouble("plan_rental"));
+                    bill.setUsageCharges(rs.getDouble("usage_charges"));
+                    bill.setTaxAmount(rs.getDouble("tax_amount"));
+                    bill.setDiscount(rs.getDouble("discount"));
+                    bill.setTotalAmount(rs.getDouble("total_amount"));
+                    Date dd = rs.getDate("due_date");
+                    if (dd != null) bill.setDueDate(dd.toLocalDate());
+                    bill.setBillStatus(rs.getString("bill_status"));
+                    Timestamp ts = rs.getTimestamp("created_at");
+                    if (ts != null) bill.setCreatedAt(ts.toLocalDateTime());
                 }
             }
         }
-        return Optional.empty();
+
+        if (bill == null) {
+            return Optional.empty();
+        }
+
+        // Step 2: Fetch joined display fields WITHOUT locking other tables
+        String joinSql = "SELECT ms.mobile_number, ms.customer_id, c.customer_number, " +
+                "CONCAT(c.first_name, ' ', c.last_name) AS customer_name " +
+                "FROM mobile_subscriptions ms " +
+                "JOIN customers c ON ms.customer_id = c.customer_id " +
+                "WHERE ms.subscription_id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(joinSql)) {
+            ps.setInt(1, bill.getSubscriptionId());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    bill.setCustomerId(rs.getInt("customer_id"));
+                    bill.setCustomerNumber(rs.getString("customer_number"));
+                    bill.setCustomerName(rs.getString("customer_name"));
+                    bill.setMobileNumber(rs.getString("mobile_number"));
+                }
+            }
+        }
+
+        return Optional.of(bill);
     }
 
     @Override

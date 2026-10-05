@@ -18,4 +18,5 @@ public interface ComplaintService {
     Map<String, int[]> getComplaintsCountByCity();
     Map<String, int[]> getComplaintsCountByCategory();
     List<Map<String, Object>> getTopCustomersByComplaints(int limit);
+    List<Map<String, Object>> getCustomersWithMultipleComplaints(int minComplaints);
 }

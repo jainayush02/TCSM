@@ -11,10 +11,14 @@ import com.amdocs.telecom.model.Bill;
 import com.amdocs.telecom.model.MobileSubscription;
 import com.amdocs.telecom.service.BillingService;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.amdocs.telecom.dao.PlanDAO;
 import com.amdocs.telecom.dao.impl.PlanDAOImpl;
@@ -22,6 +26,9 @@ import com.amdocs.telecom.model.TelecomPlan;
 import java.time.format.DateTimeFormatter;
 
 public class BillingServiceImpl implements BillingService {
+
+    private static final Logger LOGGER = Logger.getLogger(BillingServiceImpl.class.getName());
+    private static final BigDecimal TAX_RATE = new BigDecimal("0.18");
 
     private final BillingDAO billingDAO;
     private final SubscriptionDAO subscriptionDAO;
@@ -50,13 +57,22 @@ public class BillingServiceImpl implements BillingService {
             }
             MobileSubscription sub = subOpt.get();
 
-            double usageCharges = usageDAO.getTotalUsageCharge(subscriptionId, billingMonth);
-            double planRental = sub.getMonthlyRental();
-            
-            // Simple tax calculation (e.g., 18% GST)
-            double taxAmount = (planRental + usageCharges) * 0.18;
-            double discount = 0.0;
-            double totalAmount = planRental + usageCharges + taxAmount - discount;
+            // FIX #1: BigDecimal for financial precision — avoids IEEE 754 rounding errors in tax/total
+            BigDecimal usageChargesBD = BigDecimal.valueOf(usageDAO.getTotalUsageCharge(subscriptionId, billingMonth))
+                    .setScale(2, RoundingMode.HALF_UP);
+            BigDecimal planRentalBD = BigDecimal.valueOf(sub.getMonthlyRental())
+                    .setScale(2, RoundingMode.HALF_UP);
+            BigDecimal taxableSubtotal = planRentalBD.add(usageChargesBD);
+            BigDecimal taxAmountBD = taxableSubtotal.multiply(TAX_RATE).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal discountBD = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            BigDecimal totalAmountBD = taxableSubtotal.add(taxAmountBD).subtract(discountBD)
+                    .setScale(2, RoundingMode.HALF_UP);
+
+            double planRental = planRentalBD.doubleValue();
+            double usageCharges = usageChargesBD.doubleValue();
+            double taxAmount = taxAmountBD.doubleValue();
+            double discount = discountBD.doubleValue();
+            double totalAmount = totalAmountBD.doubleValue();
 
             String billNumber = "INV-" + billingMonth + "-" + (1000 + (int)(Math.random()*9000)) + "-" + subscriptionId;
 
@@ -88,9 +104,14 @@ public class BillingServiceImpl implements BillingService {
             }
             TelecomPlan plan = planOpt.get();
 
-            double planRental = plan.getMonthlyRental();
-            double taxAmount = planRental * 0.18;
-            double totalAmount = planRental + taxAmount;
+            // FIX #1: BigDecimal for financial precision
+            BigDecimal planRentalBD = BigDecimal.valueOf(plan.getMonthlyRental()).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal taxAmountBD = planRentalBD.multiply(TAX_RATE).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal totalAmountBD = planRentalBD.add(taxAmountBD).setScale(2, RoundingMode.HALF_UP);
+
+            double planRental = planRentalBD.doubleValue();
+            double taxAmount = taxAmountBD.doubleValue();
+            double totalAmount = totalAmountBD.doubleValue();
             String billingMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
             String billNumber = "INV-CHG-" + billingMonth + "-" + (1000 + (int)(Math.random() * 9000)) + "-" + subscriptionId;
 
@@ -112,12 +133,14 @@ public class BillingServiceImpl implements BillingService {
         }
     }
 
+    // FIX #2: Propagate exceptions instead of silently returning empty lists
     @Override
     public List<Bill> getCustomerBills(int customerId) {
         try {
             return billingDAO.findByCustomerId(customerId);
         } catch (SQLException e) {
-            return List.of();
+            LOGGER.log(Level.SEVERE, "Database error fetching bills for customer: " + customerId, e);
+            throw new RuntimeException("Failed to retrieve customer bills due to a database error.", e);
         }
     }
 
@@ -126,7 +149,8 @@ public class BillingServiceImpl implements BillingService {
         try {
             return billingDAO.findUnpaidBills();
         } catch (SQLException e) {
-            return List.of();
+            LOGGER.log(Level.SEVERE, "Database error fetching unpaid bills", e);
+            throw new RuntimeException("Failed to retrieve unpaid bills due to a database error.", e);
         }
     }
 }

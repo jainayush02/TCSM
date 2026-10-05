@@ -20,6 +20,7 @@ import java.util.UUID;
 
 public class ComplaintServiceImpl implements ComplaintService {
 
+    private static final java.util.logging.Logger LOGGER = java.util.logging.Logger.getLogger(ComplaintServiceImpl.class.getName());
     private final ComplaintDAO complaintDAO;
 
     public ComplaintServiceImpl() {
@@ -125,12 +126,14 @@ public class ComplaintServiceImpl implements ComplaintService {
         }
     }
 
+    // FIX #2: Propagate database errors instead of silently returning empty collections
     @Override
     public List<Complaint> getCustomerComplaints(int customerId) {
         try {
             return complaintDAO.findByCustomerId(customerId);
         } catch (SQLException e) {
-            return Collections.emptyList();
+            LOGGER.log(java.util.logging.Level.SEVERE, "Database error fetching complaints for customer: " + customerId, e);
+            throw new RuntimeException("Failed to retrieve customer complaints.", e);
         }
     }
 
@@ -139,16 +142,19 @@ public class ComplaintServiceImpl implements ComplaintService {
         try {
             return complaintDAO.findAll();
         } catch (SQLException e) {
-            return Collections.emptyList();
+            LOGGER.log(java.util.logging.Level.SEVERE, "Database error fetching all complaints", e);
+            throw new RuntimeException("Failed to retrieve complaints list.", e);
         }
     }
 
+    // FIX #2: Don't mask DB errors as 'not found'
     @Override
     public Optional<Complaint> getComplaintById(int complaintId) {
         try {
             return complaintDAO.findById(complaintId);
         } catch (SQLException e) {
-            return Optional.empty();
+            LOGGER.log(java.util.logging.Level.SEVERE, "Database error fetching complaint ID: " + complaintId, e);
+            throw new RuntimeException("Failed to look up complaint.", e);
         }
     }
 
@@ -157,7 +163,8 @@ public class ComplaintServiceImpl implements ComplaintService {
         try {
             return complaintDAO.findByNumber(complaintNumber);
         } catch (SQLException e) {
-            return Optional.empty();
+            LOGGER.log(java.util.logging.Level.SEVERE, "Database error fetching complaint: " + complaintNumber, e);
+            throw new RuntimeException("Failed to look up complaint.", e);
         }
     }
 
@@ -242,6 +249,15 @@ public class ComplaintServiceImpl implements ComplaintService {
     public List<Map<String, Object>> getTopCustomersByComplaints(int limit) {
         try {
             return complaintDAO.getTopCustomersByComplaints(limit);
+        } catch (SQLException e) {
+            return Collections.emptyList();
+        }
+    }
+
+    @Override
+    public List<Map<String, Object>> getCustomersWithMultipleComplaints(int minComplaints) {
+        try {
+            return complaintDAO.getCustomersWithMultipleComplaints(minComplaints);
         } catch (SQLException e) {
             return Collections.emptyList();
         }

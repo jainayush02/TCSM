@@ -11,6 +11,7 @@ public interface PlanService {
     List<TelecomPlan> filterPlansByMaxPrice(double maxPrice);
     List<TelecomPlan> filterPlansByMinData(int minDataGB);
     List<TelecomPlan> sortPlansByPrice(boolean ascending);
+    List<TelecomPlan> filterPlansByPriceRange(double minPrice, double maxPrice);
     TelecomPlan getPlanById(int planId) throws TelecomException;
     List<TelecomPlan> comparePlans(int planId1, int planId2) throws TelecomException;
 }

@@ -18,4 +18,5 @@ public interface ComplaintDAO {
     Map<String, int[]> getComplaintsCountByCity() throws SQLException;
     Map<String, int[]> getComplaintsCountByCategory() throws SQLException;
     List<Map<String, Object>> getTopCustomersByComplaints(int limit) throws SQLException;
+    List<Map<String, Object>> getCustomersWithMultipleComplaints(int minComplaints) throws SQLException;
 }

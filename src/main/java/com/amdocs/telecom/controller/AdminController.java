@@ -130,7 +130,11 @@ public class AdminController {
             if (opt.isPresent() && PasswordUtil.verifyPassword(password, opt.get().getPasswordHash())) {
                 loggedInAdmin = opt.get();
                 adminDAO.updateAccountStatus(loggedInAdmin.getAdminId(), "ACTIVE");
+                
+                // Show last login timestamp before recording new login
+                Optional<String> lastLogin = new CustomerDAOImpl().getLastLoginTimestamp(username);
                 System.out.println("\n✅ Admin login successful! Welcome, " + loggedInAdmin.getFullName());
+                lastLogin.ifPresent(ts -> System.out.println("  🕒 Last Login Timestamp: " + ts));
 
                 // Log login
                 new CustomerDAOImpl().logLoginAttempt(username, "ADMIN", "127.0.0.1", "SUCCESS");
@@ -415,7 +419,7 @@ public class AdminController {
     }
 
     private void showRevenueReports() {
-        System.out.println("\n┌─── REVENUE REPORTS ─────────────────┐");
+        System.out.println("\n┌─── REVENUE REPORTS & ANALYTICS ─────┐");
 
         Map<String, DoubleSummaryStatistics> revenue = reportService.getRevenueSummaryByPlan();
         if (revenue.isEmpty()) {
@@ -430,6 +434,29 @@ public class AdminController {
 
         double avgPerCustomer = reportService.getAverageMonthlyRevenuePerCustomer();
         System.out.printf("%n  Average Monthly Revenue per Customer: ₹%.2f%n", avgPerCustomer);
+
+        // Java 8 Stream API: Most Subscribed Plans
+        List<Map<String, Object>> topPlans = reportService.getMostSubscribedPlans();
+        if (!topPlans.isEmpty()) {
+            System.out.println("\n  📈 MOST SUBSCRIBED PLANS (Java 8 Stream Grouping & Sorting):");
+            System.out.printf("  %-10s %-20s %-12s %s%n", "Code", "Name", "Monthly(₹)", "Subscribers");
+            System.out.println("  " + "-".repeat(55));
+            for (Map<String, Object> p : topPlans) {
+                System.out.printf("  %-10s %-20s ₹%-11.2f %d%n",
+                        p.get("planCode"),
+                        String.valueOf(p.get("planName")),
+                        (Double) p.get("monthlyRental"),
+                        (Long) p.get("subscriberCount"));
+            }
+        }
+
+        // Java 8 Stream API: Overall Usage by Type
+        Map<String, Double> usageByType = reportService.getOverallUsageByType();
+        if (!usageByType.isEmpty()) {
+            System.out.println("\n  📊 TOTAL TELECOM USAGE BY TYPE (Java 8 Stream):");
+            usageByType.forEach((type, qty) -> System.out.printf("    • %-10s : %.2f units%n", type, qty));
+        }
+
         System.out.println("└──────────────────────────────────────┘");
 
         if (!revenue.isEmpty()) {
@@ -756,6 +783,22 @@ public class AdminController {
                     name.length() > 18 ? name.substring(0, 18) : name,
                     city.length() > 12 ? city.substring(0, 12) : city,
                     mob, tot, pen, res);
+        }
+
+        // Section 4: SQL HAVING Clause Demonstration
+        List<Map<String, Object>> multiComplaints = complaintService.getCustomersWithMultipleComplaints(2);
+        if (!multiComplaints.isEmpty()) {
+            System.out.println("\n  ⚡ 4. FREQUENT COMPLAINANTS (SQL HAVING >= 2 Complaints Filter):");
+            System.out.printf("  %-12s %-20s %-14s %-14s %s%n", "Cust No", "Name", "City", "Mobile", "Complaints");
+            System.out.println("  " + "-".repeat(68));
+            for (Map<String, Object> map : multiComplaints) {
+                System.out.printf("  %-12s %-20s %-14s %-14s %d%n",
+                        map.get("customerNumber"),
+                        map.get("customerName"),
+                        map.get("city"),
+                        map.get("mobileNumber"),
+                        (Integer) map.get("complaintCount"));
+            }
         }
 
         System.out.println("└─────────────────────────────────────────────────────────────────────────────┘");

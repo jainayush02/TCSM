@@ -17,6 +17,7 @@ set SRC_DIR=src\main\java
 set RES_DIR=src\main\resources
 set OUT_DIR=target\classes
 set LIB_DIR=lib
+set SOURCES_FILE=%TEMP%\tcsms-sources.txt
 
 if not exist "%OUT_DIR%" mkdir "%OUT_DIR%"
 if not exist "%LIB_DIR%" mkdir "%LIB_DIR%"
@@ -40,8 +41,9 @@ echo.
 echo Compiling Java sources...
 set CLASSPATH=%LIB_DIR%\h2-2.2.224.jar;%LIB_DIR%\mysql-connector-j-8.3.0.jar;%LIB_DIR%\jbcrypt-0.4.jar
 
-dir /s /b "%SRC_DIR%\*.java" > sources.txt
-javac -encoding UTF-8 -cp "%CLASSPATH%" -d "%OUT_DIR%" @sources.txt
+dir /s /b "%SRC_DIR%\*.java" > "%SOURCES_FILE%"
+javac -encoding UTF-8 -cp "%CLASSPATH%" -d "%OUT_DIR%" @"%SOURCES_FILE%"
+del /q "%SOURCES_FILE%" >nul 2>&1
 
 if %ERRORLEVEL% NEQ 0 (
     echo.

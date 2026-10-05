@@ -111,27 +111,29 @@ public class CustomerServiceImpl implements CustomerService {
             return customerDAO.findAll();
         } catch (SQLException e) {
             LOGGER.log(Level.SEVERE, "Error fetching all customers", e);
-            return List.of();
+            throw new RuntimeException("Failed to retrieve customer list due to a database error.", e);
         }
     }
 
+    // FIX #2: Return 'true' (fail-safe) on DB error to prevent duplicate registrations
     @Override
     public boolean isUsernameRegistered(String username) {
         try {
             return customerDAO.findByUsername(username).isPresent();
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "Error checking username", e);
-            return false;
+            LOGGER.log(Level.SEVERE, "Database error checking username availability: " + username, e);
+            return true; // Fail-safe: assume taken to prevent duplicate registration
         }
     }
 
+    // FIX #2: Return 'true' (fail-safe) on DB error
     @Override
     public boolean isUserRegistered(String usernameOrEmail) {
         try {
             return customerDAO.findByUsernameOrEmail(usernameOrEmail).isPresent();
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "Error checking username or email", e);
-            return false;
+            LOGGER.log(Level.SEVERE, "Database error checking username or email: " + usernameOrEmail, e);
+            return true; // Fail-safe: assume registered to prevent inconsistency
         }
     }
 }
