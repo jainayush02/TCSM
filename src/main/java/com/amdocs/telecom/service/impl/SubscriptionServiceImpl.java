@@ -101,7 +101,9 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 auditDAO.logAudit(audit);
             } catch (SQLException auditError) {
                 java.util.logging.Logger.getLogger(SubscriptionServiceImpl.class.getName())
-                        .warning("Subscription created but activity logging failed: " + auditError.getMessage());
+                        .log(java.util.logging.Level.WARNING,
+                            "Subscription created but activity logging failed: {0}",
+                            auditError.getMessage());
             }
             return created;
         } catch (SQLException e) {
@@ -162,7 +164,9 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                     auditDAO.logAudit(audit);
                 } catch (SQLException auditError) {
                     java.util.logging.Logger.getLogger(SubscriptionServiceImpl.class.getName())
-                            .warning("Plan changed but activity logging failed: " + auditError.getMessage());
+                                .log(java.util.logging.Level.WARNING,
+                                    "Plan changed but activity logging failed: {0}",
+                                    auditError.getMessage());
                 }
             }
             return changed;
