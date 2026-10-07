@@ -78,11 +78,13 @@ public class UsageDAOImpl implements UsageDAO {
         List<UsageRecord> list = new ArrayList<>();
         // The billing month uses yyyy-MM format.
         String sql = "SELECT * FROM usage_records WHERE subscription_id = ? AND " +
-                "SUBSTRING(CAST(usage_date AS CHAR), 1, 7) = ? ORDER BY usage_date ASC";
+                "usage_date >= ? AND usage_date < ? ORDER BY usage_date ASC";
         try (Connection conn = DBConnection.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, subscriptionId);
-            ps.setString(2, yearMonth);
+            java.time.YearMonth month = java.time.YearMonth.parse(yearMonth);
+            ps.setTimestamp(2, Timestamp.valueOf(month.atDay(1).atStartOfDay()));
+            ps.setTimestamp(3, Timestamp.valueOf(month.plusMonths(1).atDay(1).atStartOfDay()));
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     list.add(mapResultSetToUsage(rs));
@@ -126,11 +128,13 @@ public class UsageDAOImpl implements UsageDAO {
     @Override
     public double getTotalUsageCharge(int subscriptionId, String yearMonth) throws SQLException {
         String sql = "SELECT COALESCE(SUM(charge), 0.0) FROM usage_records " +
-                "WHERE subscription_id = ? AND SUBSTRING(CAST(usage_date AS CHAR), 1, 7) = ?";
+                "WHERE subscription_id = ? AND usage_date >= ? AND usage_date < ?";
         try (Connection conn = DBConnection.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, subscriptionId);
-            ps.setString(2, yearMonth);
+            java.time.YearMonth month = java.time.YearMonth.parse(yearMonth);
+            ps.setTimestamp(2, Timestamp.valueOf(month.atDay(1).atStartOfDay()));
+            ps.setTimestamp(3, Timestamp.valueOf(month.plusMonths(1).atDay(1).atStartOfDay()));
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return rs.getDouble(1);

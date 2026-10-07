@@ -52,7 +52,7 @@ public class UsageRecord {
 
     @Override
     public String toString() {
-        return String.format("[%s] Type: %-7s | Quantity: %6.1f %-7s | Charge: ₹%6.2f",
+        return String.format("[%s] Type: %-7s | Quantity: %6.1f %-7s | Charge: Rs %6.2f",
                 usageDate, usageType, quantity, unit, charge);
     }
 }

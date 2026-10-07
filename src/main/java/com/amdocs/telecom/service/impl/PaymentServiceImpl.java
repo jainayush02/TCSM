@@ -49,6 +49,8 @@ public class PaymentServiceImpl implements PaymentService {
     public Payment processPayment(int billId, int customerId, double amount, String paymentModeStr, String processedBy) throws TelecomException {
         // Validate payment mode and execute strategy before acquiring DB lock
         // This keeps the lock short and reduces deadlock risk.
+        if (!Double.isFinite(amount) || amount <= 0) throw new TelecomException("Payment amount must be finite and positive.");
+        if (paymentModeStr == null) throw new TelecomException("Payment mode is required.");
         PaymentMode mode;
         try {
             mode = PaymentMode.valueOf(paymentModeStr.toUpperCase());

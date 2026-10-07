@@ -3,6 +3,12 @@ package com.amdocs.telecom.model;
 import java.time.LocalDateTime;
 
 public class TelecomPlan {
+    private boolean allowTypeChange;
+    private int minimumChangeDays;
+    public boolean isAllowTypeChange() { return allowTypeChange; }
+    public void setAllowTypeChange(boolean value) { allowTypeChange=value; }
+    public int getMinimumChangeDays() { return minimumChangeDays; }
+    public void setMinimumChangeDays(int value) { minimumChangeDays=value; }
     private int planId;
     private String planCode;
     private String planName;
@@ -83,7 +89,7 @@ public class TelecomPlan {
 
     @Override
     public String toString() {
-        return String.format("%-10s | %-16s | %-8s | %3d GB | %-10s | ₹%7.2f | Roaming: %s | %s",
+        return String.format("%-10s | %-16s | %-8s | %3d GB | %-10s | Rs %7.2f | Roaming: %s | %s",
                 planCode, planName, planType, dataAllowanceGB, getVoiceDisplay(), monthlyRental,
                 (internationalRoaming ? "Yes" : "No"), status);
     }

@@ -14,8 +14,8 @@ public class BillingDAOImpl implements BillingDAO {
     @Override
     public Bill save(Bill bill) throws SQLException {
         String sql = "INSERT INTO bills (bill_number, subscription_id, billing_month, plan_rental, " +
-                "usage_charges, tax_amount, discount, total_amount, due_date, bill_status) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "usage_charges, tax_amount, discount, total_amount, due_date, bill_status, invoice_type, invoice_key) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (Connection conn = DBConnection.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
@@ -30,6 +30,8 @@ public class BillingDAOImpl implements BillingDAO {
             ps.setDate(9, Date.valueOf(bill.getDueDate()));
             ps.setString(10, bill.getBillStatus() != null ? bill.getBillStatus() : "UNPAID");
 
+            ps.setString(11, bill.getInvoiceType());
+            ps.setString(12, bill.getInvoiceKey() != null ? bill.getInvoiceKey() : "MONTHLY:"+bill.getSubscriptionId()+":"+bill.getBillingMonth());
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) {
@@ -137,7 +139,7 @@ public class BillingDAOImpl implements BillingDAO {
                 "FROM bills b " +
                 "JOIN mobile_subscriptions ms ON b.subscription_id = ms.subscription_id " +
                 "JOIN customers c ON ms.customer_id = c.customer_id " +
-                "WHERE b.subscription_id = ? AND b.billing_month = ?";
+                "WHERE b.subscription_id = ? AND b.billing_month = ? AND b.invoice_type = 'MONTHLY'";
         try (Connection conn = DBConnection.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, subscriptionId);
@@ -250,6 +252,8 @@ public class BillingDAOImpl implements BillingDAO {
         b.setBillNumber(rs.getString("bill_number"));
         b.setSubscriptionId(rs.getInt("subscription_id"));
         b.setBillingMonth(rs.getString("billing_month"));
+        b.setInvoiceType(rs.getString("invoice_type"));
+        b.setInvoiceKey(rs.getString("invoice_key"));
         b.setPlanRental(rs.getDouble("plan_rental"));
         b.setUsageCharges(rs.getDouble("usage_charges"));
         b.setTaxAmount(rs.getDouble("tax_amount"));

@@ -6,7 +6,8 @@ import java.util.List;
 import java.util.Map;
 
 public interface ReportService {
-    List<Customer> getHighestConsumingCustomers();
+    List<Customer> getHighestConsumingCustomers(com.amdocs.telecom.model.UsageType type);
+    default List<Customer> getHighestConsumingCustomers() { return getHighestConsumingCustomers(com.amdocs.telecom.model.UsageType.DATA); }
     Map<String, List<Customer>> getCustomersByCity();
     Map<String, DoubleSummaryStatistics> getRevenueSummaryByPlan();
     double getAverageMonthlyRevenuePerCustomer();

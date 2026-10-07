@@ -46,32 +46,16 @@ public class ReportServiceImpl implements ReportService {
     }
 
     @Override
-    public List<Customer> getHighestConsumingCustomers() {
-        // Find customers with the highest total bills.
+    public List<Customer> getHighestConsumingCustomers(com.amdocs.telecom.model.UsageType type) {
+        if(type==null) throw new IllegalArgumentException("Usage type is required.");
         try {
-            List<Bill> allBills = billingDAO.findAll();
-            
-            // Group bills by customer and total the amounts.
-            Map<Integer, Double> customerTotals = allBills.stream()
-                    .collect(Collectors.groupingBy(
-                            Bill::getCustomerId,
-                            Collectors.summingDouble(Bill::getTotalAmount)
-                    ));
-
-            List<Customer> allCustomers = customerDAO.findAll();
-            
-            // Sort customers by total bill amount, highest first.
-            return allCustomers.stream()
-                    .sorted((c1, c2) -> Double.compare(
-                            customerTotals.getOrDefault(c2.getCustomerId(), 0.0),
-                            customerTotals.getOrDefault(c1.getCustomerId(), 0.0)
-                    ))
-                    .limit(10) // Top 10
-                    .collect(Collectors.toList());
-
-        } catch (SQLException e) {
-            return List.of();
-        }
+            Map<Integer,Integer> owners=subscriptionDAO.findAll().stream().collect(Collectors.toMap(MobileSubscription::getSubscriptionId,MobileSubscription::getCustomerId));
+            Map<Integer,Double> totals=usageDAO.findAll().stream().filter(r -> r.getUsageType()==type && owners.containsKey(r.getSubscriptionId()))
+                    .collect(Collectors.groupingBy(r -> owners.get(r.getSubscriptionId()),Collectors.summingDouble(r -> com.amdocs.telecom.util.UsageUnits.normalize(type,r.getQuantity(),r.getUnit()))));
+            return customerDAO.findAll().stream().filter(c -> totals.containsKey(c.getCustomerId()))
+                    .sorted(java.util.Comparator.<Customer>comparingDouble(c -> totals.get(c.getCustomerId())).reversed().thenComparingInt(Customer::getCustomerId))
+                    .limit(10).collect(Collectors.toList());
+        } catch(SQLException e) { throw new IllegalStateException("Could not calculate usage ranking.",e); }
     }
 
     @Override
@@ -82,7 +66,7 @@ public class ReportServiceImpl implements ReportService {
             return allCustomers.stream()
                     .collect(Collectors.groupingBy(Customer::getCity));
         } catch (SQLException e) {
-            return Map.of();
+            throw new IllegalStateException("Database operation failed.", e);
         }
     }
 
@@ -98,7 +82,7 @@ public class ReportServiceImpl implements ReportService {
                             Collectors.summarizingDouble(Bill::getTotalAmount)
                     ));
         } catch (SQLException e) {
-            return Map.of();
+            throw new IllegalStateException("Database operation failed.", e);
         }
     }
 
@@ -115,9 +99,10 @@ public class ReportServiceImpl implements ReportService {
                     .mapToDouble(Bill::getTotalAmount)
                     .sum();
 
-            return totalRevenue / allCustomers.size();
+            long months = allBills.stream().filter(b -> "PAID".equals(b.getBillStatus())).map(Bill::getBillingMonth).distinct().count();
+            return months == 0 ? 0.0 : totalRevenue / allCustomers.size() / months;
         } catch (SQLException e) {
-            return 0.0;
+            throw new IllegalStateException("Database operation failed.", e);
         }
     }
 
@@ -154,7 +139,7 @@ public class ReportServiceImpl implements ReportService {
                     })
                     .collect(Collectors.toList());
         } catch (SQLException e) {
-            return List.of();
+            throw new IllegalStateException("Database operation failed.", e);
         }
     }
 
@@ -181,7 +166,7 @@ public class ReportServiceImpl implements ReportService {
                     .filter(hasUnpaidBill)
                     .collect(Collectors.toList());
         } catch (SQLException e) {
-            return List.of();
+            throw new IllegalStateException("Database operation failed.", e);
         }
     }
 
@@ -195,10 +180,10 @@ public class ReportServiceImpl implements ReportService {
                     .collect(Collectors.groupingBy(
                             r -> r.getUsageType().name(),
                             LinkedHashMap::new,
-                            Collectors.summingDouble(UsageRecord::getQuantity)
+                            Collectors.summingDouble(r -> com.amdocs.telecom.util.UsageUnits.normalize(r.getUsageType(),r.getQuantity(),r.getUnit()))
                     ));
         } catch (SQLException e) {
-            return Map.of();
+            throw new IllegalStateException("Database operation failed.", e);
         }
     }
 }

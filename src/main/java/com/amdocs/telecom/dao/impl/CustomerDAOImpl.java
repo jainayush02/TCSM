@@ -135,7 +135,7 @@ public class CustomerDAOImpl implements CustomerDAO {
     @Override
     public boolean update(Customer customer) throws SQLException {
         String sql = "UPDATE customers SET first_name = ?, last_name = ?, date_of_birth = ?, " +
-                "address = ?, city = ?, country = ? WHERE customer_id = ?";
+                "address = ?, city = ?, country = ?, updated_at=CURRENT_TIMESTAMP WHERE customer_id = ?";
         try (Connection conn = DBConnection.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, customer.getFirstName());
@@ -186,39 +186,34 @@ public class CustomerDAOImpl implements CustomerDAO {
 
     @Override
     public int getRecentFailedLoginAttempts(String username, int withinMinutes) throws SQLException {
-        // Count failures since the last successful login.
-        String sql = "SELECT COUNT(*) FROM login_history WHERE username = ? AND status = 'FAILED' " +
-                "AND login_timestamp >= TIMESTAMPADD(MINUTE, -?, CURRENT_TIMESTAMP) " +
-                "AND login_timestamp > COALESCE((SELECT MAX(login_timestamp) FROM login_history WHERE username = ? AND status = 'SUCCESS'), '1970-01-01 00:00:00')";
-        try (Connection conn = DBConnection.getInstance().getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, username);
-            ps.setInt(2, withinMinutes);
-            ps.setString(3, username);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getInt(1);
-                }
-            }
+        return getRecentFailedLoginAttempts(username, "CUSTOMER", withinMinutes);
+    }
+
+    @Override
+    public int getRecentFailedLoginAttempts(String username, String role, int withinMinutes) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM login_history WHERE username=? AND user_role=? AND status='FAILED' " +
+                "AND login_timestamp >= ? AND login_id > COALESCE((SELECT MAX(login_id) FROM login_history " +
+                "WHERE username=? AND user_role=? AND status IN ('SUCCESS','RESET')),0)";
+        try (Connection c=DBConnection.getInstance().getConnection(); PreparedStatement p=c.prepareStatement(sql)) {
+            p.setString(1,username); p.setString(2,role);
+            p.setTimestamp(3,Timestamp.valueOf(java.time.LocalDateTime.now().minusMinutes(withinMinutes)));
+            p.setString(4,username); p.setString(5,role);
+            try(ResultSet r=p.executeQuery()) { r.next(); return r.getInt(1); }
         }
-        return 0;
     }
 
     @Override
     public Optional<String> getLastLoginTimestamp(String username) throws SQLException {
-        String sql = "SELECT login_timestamp FROM login_history WHERE username = ? AND status = 'SUCCESS' " +
-                "ORDER BY login_timestamp DESC LIMIT 1";
-        try (Connection conn = DBConnection.getInstance().getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, username);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    Timestamp ts = rs.getTimestamp("login_timestamp");
-                    return Optional.ofNullable(ts != null ? ts.toString() : null);
-                }
-            }
+        return getLastLoginTimestamp(username,"CUSTOMER");
+    }
+
+    @Override
+    public Optional<String> getLastLoginTimestamp(String username, String role) throws SQLException {
+        try(Connection c=DBConnection.getInstance().getConnection(); PreparedStatement p=c.prepareStatement(
+                "SELECT login_timestamp FROM login_history WHERE username=? AND user_role=? AND status='SUCCESS' ORDER BY login_id DESC LIMIT 1")) {
+            p.setString(1,username); p.setString(2,role);
+            try(ResultSet r=p.executeQuery()) { return r.next()?Optional.of(r.getTimestamp(1).toString()):Optional.empty(); }
         }
-        return Optional.empty();
     }
 
     private Customer mapResultSetToCustomer(ResultSet rs) throws SQLException {

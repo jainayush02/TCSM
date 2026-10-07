@@ -48,6 +48,8 @@ public class DBConnection {
     }
 
     public Connection getConnection() throws SQLException {
+        Connection managed = Transactions.currentConnection();
+        if (managed != null) return managed;
         Connection pooled = connectionPool.poll();
         if (pooled != null) {
             try {
@@ -73,6 +75,8 @@ public class DBConnection {
                     System.getenv().getOrDefault("TCSMS_DB_PASSWORD", properties.getProperty("db.password", ""))
                 );
             } catch (ClassNotFoundException | SQLException e) {
+                if (Boolean.parseBoolean(properties.getProperty("db.required", "false")))
+                    throw new SQLException("The configured database is required for this run.", e);
                 LOGGER.log(Level.INFO,
                         "MySQL connection unavailable ({0}). Switching to local fallback database.",
                         e.getMessage());
@@ -105,14 +109,14 @@ public class DBConnection {
             LOGGER.log(Level.INFO, "Connected to database successfully: {0}",
                     conn.getMetaData().getDatabaseProductName());
             runScript(conn, "schema.sql");
-            ensureAdministratorAccountStatusColumn(conn);
+            SchemaMigration.apply(conn);
             runScript(conn, "seed.sql");
         } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, "Failed to initialize database tables", e);
+            throw new IllegalStateException("Failed to initialize database tables", e);
         }
     }
 
-    private static void runScript(Connection conn, String scriptPath) {
+    private static void runScript(Connection conn, String scriptPath) throws SQLException {
         try (InputStream is = DBConnection.class.getClassLoader().getResourceAsStream(scriptPath)) {
             if (is == null) return;
             BufferedReader reader = new BufferedReader(new InputStreamReader(is));
@@ -133,14 +137,8 @@ public class DBConnection {
                         try (Statement stmt = conn.createStatement()) {
                             stmt.execute(sql);
                         } catch (SQLException e) {
-                            // Ignore duplicate-object errors; surface anything unexpected.
-                            if (!e.getMessage().toLowerCase().contains("already exists")) {
-                                LOGGER.log(Level.FINE, "SQL note on [{0}...]: {1}",
-                                        new Object[] {
-                                                sql.substring(0, Math.min(30, sql.length())),
-                                                e.getMessage()
-                                        });
-                            }
+                            String state = e.getSQLState();
+                            if (!("42S11".equals(state) || "42111".equals(state) || e.getErrorCode() == 1061)) throw e;
                         }
                     }
                     sb.setLength(0);
@@ -149,22 +147,6 @@ public class DBConnection {
         } catch (IOException e) {
             LOGGER.log(Level.WARNING, "Notice while running {0}: {1}",
                     new Object[] {scriptPath, e.getMessage()});
-        }
-    }
-
-    private static void ensureAdministratorAccountStatusColumn(Connection conn) throws SQLException {
-        boolean exists = false;
-        try (java.sql.ResultSet columns = conn.getMetaData().getColumns(null, null, "ADMINISTRATORS", "ACCOUNT_STATUS")) {
-            while (columns.next()) {
-                exists = true;
-                break;
-            }
-        }
-
-        if (!exists) {
-            try (Statement statement = conn.createStatement()) {
-                statement.executeUpdate("ALTER TABLE administrators ADD COLUMN account_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'");
-            }
         }
     }
 
@@ -193,9 +175,10 @@ public class DBConnection {
             if (!closed) {
                 closed = true;
                 try {
-                    // Reset the connection before returning it to the pool.
+                    // Clear pending work before returning the connection.
                     if (!delegate.isClosed()) {
                         if (!delegate.getAutoCommit()) {
+                            delegate.rollback();
                             delegate.setAutoCommit(true);
                         }
                         // Return it to the pool or close it when the pool is full.

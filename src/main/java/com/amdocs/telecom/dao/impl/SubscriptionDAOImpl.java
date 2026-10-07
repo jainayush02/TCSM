@@ -152,7 +152,7 @@ public class SubscriptionDAOImpl implements SubscriptionDAO {
     @Override
     public boolean changePlan(int subscriptionId, int newPlanId, String reason, String changedBy) throws SQLException {
         String getOldPlanSql = "SELECT plan_id FROM mobile_subscriptions WHERE subscription_id = ?";
-        String updateSubSql = "UPDATE mobile_subscriptions SET plan_id = ?, updated_at = CURRENT_TIMESTAMP WHERE subscription_id = ?";
+        String updateSubSql = "UPDATE mobile_subscriptions SET plan_id = ?, subscription_type=(SELECT plan_type FROM telecom_plans WHERE plan_id=?), updated_at = CURRENT_TIMESTAMP WHERE subscription_id = ?";
         String insertHistorySql = "INSERT INTO subscription_history (subscription_id, old_plan_id, new_plan_id, change_reason, changed_by) " +
                 "VALUES (?, ?, ?, ?, ?)";
 
@@ -176,7 +176,8 @@ public class SubscriptionDAOImpl implements SubscriptionDAO {
 
             try (PreparedStatement psUpdate = conn.prepareStatement(updateSubSql)) {
                 psUpdate.setInt(1, newPlanId);
-                psUpdate.setInt(2, subscriptionId);
+                psUpdate.setInt(2, newPlanId);
+                psUpdate.setInt(3, subscriptionId);
                 psUpdate.executeUpdate();
             }
 
@@ -210,7 +211,7 @@ public class SubscriptionDAOImpl implements SubscriptionDAO {
                 "FROM subscription_history sh " +
                 "LEFT JOIN telecom_plans pOld ON sh.old_plan_id = pOld.plan_id " +
                 "JOIN telecom_plans pNew ON sh.new_plan_id = pNew.plan_id " +
-                "WHERE sh.subscription_id = ? ORDER BY sh.change_date DESC";
+                "WHERE sh.subscription_id = ? ORDER BY sh.change_date DESC, sh.history_id DESC";
         try (Connection conn = DBConnection.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, subscriptionId);
@@ -255,7 +256,7 @@ public class SubscriptionDAOImpl implements SubscriptionDAO {
     @Override
     public Optional<SIMCard> findAvailableSIM(String simType) throws SQLException {
         String sql = "SELECT * FROM sim_cards WHERE sim_type = ? AND status = 'ACTIVE' " +
-                "AND sim_id NOT IN (SELECT sim_id FROM mobile_subscriptions) LIMIT 1";
+                "AND sim_id NOT IN (SELECT sim_id FROM mobile_subscriptions) ORDER BY sim_id LIMIT 1 FOR UPDATE";
         try (Connection conn = DBConnection.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, simType);

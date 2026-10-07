@@ -37,14 +37,19 @@ public class UsageServiceImpl implements UsageService {
     // Propagate failures instead of returning null.
     @Override
     public UsageRecord recordUsage(int subscriptionId, String usageTypeStr, double quantity, String unit) {
-        if (quantity <= 0) {
+        if (!Double.isFinite(quantity) || quantity <= 0) {
             throw new IllegalArgumentException("Usage quantity must be greater than zero.");
         }
         if (unit == null || unit.trim().isEmpty()) {
             throw new IllegalArgumentException("Usage unit is required.");
         }
         try {
+            if (usageTypeStr == null) throw new IllegalArgumentException("Usage type is required.");
             UsageType usageType = UsageType.valueOf(usageTypeStr.toUpperCase());
+            quantity = com.amdocs.telecom.util.UsageUnits.normalize(usageType,quantity,unit);
+            unit = com.amdocs.telecom.util.UsageUnits.unit(usageType);
+            MobileSubscription sub = subscriptionDAO.findById(subscriptionId).orElseThrow(() -> new IllegalArgumentException("Subscription not found."));
+            if (!"ACTIVE".equals(sub.getStatus())) throw new IllegalArgumentException("Only active subscriptions can record usage.");
             // The demo uses a flat charge; production would use plan rates.
             double charge = 0.0;
             if (usageType == UsageType.ROAMING) charge = quantity * 0.5; // Example charge
@@ -57,7 +62,15 @@ public class UsageServiceImpl implements UsageService {
             record.setUnit(unit);
             record.setCharge(charge);
             
-            UsageRecord saved = usageDAO.save(record);
+            UsageRecord saved;
+            try {
+                saved = com.amdocs.telecom.util.Transactions.run(() -> {
+                    com.amdocs.telecom.util.Transactions.lockSubscriptions(java.util.List.of(subscriptionId));
+                    UsageRecord inserted=usageDAO.save(record);
+                    new BillingServiceImpl().reconcileUsage(subscriptionId,java.time.YearMonth.from(record.getUsageDate()).toString());
+                    return inserted;
+                });
+            } catch (com.amdocs.telecom.exception.TelecomException e) { throw new IllegalStateException("Could not record and bill usage.",e); }
             AuditLog audit = new AuditLog();
             audit.setEntityName("USAGE");
             audit.setEntityId(String.valueOf(saved.getUsageId()));
@@ -108,7 +121,7 @@ public class UsageServiceImpl implements UsageService {
     public Map<String, Double> getUsageSummary(int subscriptionId) {
         Map<String, Double> result = new LinkedHashMap<>();
         try {
-            Map<UsageType, Double> summary = usageDAO.getUsageSummaryByType(subscriptionId);
+            Map<UsageType, Double> summary = usageDAO.findBySubscriptionId(subscriptionId).stream().collect(java.util.stream.Collectors.groupingBy(UsageRecord::getUsageType,java.util.stream.Collectors.summingDouble(r -> com.amdocs.telecom.util.UsageUnits.normalize(r.getUsageType(),r.getQuantity(),r.getUnit()))));
             for (Map.Entry<UsageType, Double> entry : summary.entrySet()) {
                 result.put(entry.getKey().name(), entry.getValue());
             }

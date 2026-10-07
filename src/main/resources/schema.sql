@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS customers (
     username VARCHAR(50) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     registration_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     account_status VARCHAR(20) DEFAULT 'ACTIVE'
 );
 
@@ -31,7 +32,7 @@ CREATE TABLE IF NOT EXISTS administrators (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-ALTER TABLE administrators ADD COLUMN IF NOT EXISTS account_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE';
+
 
 -- Telecom Tariff Plans Table
 CREATE TABLE IF NOT EXISTS telecom_plans (
@@ -39,12 +40,14 @@ CREATE TABLE IF NOT EXISTS telecom_plans (
     plan_code VARCHAR(30) NOT NULL UNIQUE,
     plan_name VARCHAR(100) NOT NULL,
     plan_type VARCHAR(20) NOT NULL,
-    monthly_rental DOUBLE NOT NULL,
+    monthly_rental DECIMAL(18,2) NOT NULL,
     data_allowance_gb INT NOT NULL,
     voice_minutes INT NOT NULL,
     sms_allowance INT NOT NULL,
     validity_days INT NOT NULL,
     international_roaming BOOLEAN DEFAULT FALSE,
+    allow_type_change BOOLEAN NOT NULL DEFAULT FALSE,
+    minimum_change_days INT NOT NULL DEFAULT 0,
     status VARCHAR(20) DEFAULT 'ACTIVE',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -100,7 +103,7 @@ CREATE TABLE IF NOT EXISTS usage_records (
     usage_type VARCHAR(20) NOT NULL,
     quantity DOUBLE NOT NULL,
     unit VARCHAR(20) NOT NULL,
-    charge DOUBLE NOT NULL DEFAULT 0.0,
+    charge DECIMAL(18,2) NOT NULL DEFAULT 0.0,
     FOREIGN KEY (subscription_id) REFERENCES mobile_subscriptions(subscription_id) ON DELETE CASCADE
 );
 
@@ -110,19 +113,18 @@ CREATE TABLE IF NOT EXISTS bills (
     bill_number VARCHAR(50) NOT NULL UNIQUE,
     subscription_id INT NOT NULL,
     billing_month VARCHAR(10) NOT NULL,
-    plan_rental DOUBLE NOT NULL,
-    usage_charges DOUBLE NOT NULL,
-    tax_amount DOUBLE NOT NULL,
-    discount DOUBLE NOT NULL DEFAULT 0.0,
-    total_amount DOUBLE NOT NULL,
+    invoice_type VARCHAR(20) NOT NULL DEFAULT 'MONTHLY',
+    invoice_key VARCHAR(100),
+    plan_rental DECIMAL(18,2) NOT NULL,
+    usage_charges DECIMAL(18,2) NOT NULL,
+    tax_amount DECIMAL(18,2) NOT NULL,
+    discount DECIMAL(18,2) NOT NULL DEFAULT 0.0,
+    total_amount DECIMAL(18,2) NOT NULL,
     due_date DATE NOT NULL,
     bill_status VARCHAR(20) DEFAULT 'UNPAID',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (subscription_id) REFERENCES mobile_subscriptions(subscription_id) ON DELETE CASCADE
 );
-
-CREATE UNIQUE INDEX IF NOT EXISTS uq_bill_subscription_month
-    ON bills(subscription_id, billing_month);
 
 -- Payments Table
 CREATE TABLE IF NOT EXISTS payments (
@@ -130,7 +132,7 @@ CREATE TABLE IF NOT EXISTS payments (
     transaction_reference VARCHAR(50) NOT NULL UNIQUE,
     bill_id INT NOT NULL,
     customer_id INT NOT NULL,
-    amount DOUBLE NOT NULL,
+    amount DECIMAL(18,2) NOT NULL,
     payment_mode VARCHAR(20) NOT NULL,
     payment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     payment_status VARCHAR(20) NOT NULL,
@@ -187,10 +189,45 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 
 -- Indexes for performance
-CREATE INDEX IF NOT EXISTS idx_customer_email ON customers(email);
-CREATE INDEX IF NOT EXISTS idx_customer_mobile ON customers(mobile_number);
-CREATE INDEX IF NOT EXISTS idx_sub_customer ON mobile_subscriptions(customer_id);
-CREATE INDEX IF NOT EXISTS idx_usage_sub ON usage_records(subscription_id);
-CREATE INDEX IF NOT EXISTS idx_bill_sub ON bills(subscription_id);
-CREATE INDEX IF NOT EXISTS idx_bill_status ON bills(bill_status);
-CREATE INDEX IF NOT EXISTS idx_complaint_status ON complaints(status);
+CREATE INDEX idx_customer_email ON customers(email);
+CREATE INDEX idx_customer_mobile ON customers(mobile_number);
+CREATE INDEX idx_sub_customer ON mobile_subscriptions(customer_id);
+CREATE INDEX idx_usage_sub ON usage_records(subscription_id);
+CREATE INDEX idx_bill_sub ON bills(subscription_id);
+CREATE INDEX idx_bill_status ON bills(bill_status);
+CREATE INDEX idx_complaint_status ON complaints(status);
+
+CREATE TABLE IF NOT EXISTS account_security (
+    username VARCHAR(50) NOT NULL,
+    user_role VARCHAR(20) NOT NULL,
+    locked_until TIMESTAMP,
+    PRIMARY KEY (username, user_role)
+);
+
+CREATE TABLE IF NOT EXISTS add_on_services (
+    add_on_id INT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(30) NOT NULL UNIQUE,
+    name VARCHAR(100) NOT NULL,
+    monthly_price DECIMAL(18,2) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS subscription_add_ons (
+    subscription_id INT NOT NULL,
+    add_on_id INT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    activated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (subscription_id, add_on_id),
+    FOREIGN KEY (subscription_id) REFERENCES mobile_subscriptions(subscription_id),
+    FOREIGN KEY (add_on_id) REFERENCES add_on_services(add_on_id)
+);
+
+CREATE TABLE IF NOT EXISTS billing_credits (
+    subscription_id INT PRIMARY KEY,
+    amount DECIMAL(18,2) NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (subscription_id) REFERENCES mobile_subscriptions(subscription_id)
+);

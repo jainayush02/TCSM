@@ -1,5 +1,7 @@
 package com.amdocs.telecom.controller;
 
+import com.amdocs.telecom.util.ConsoleMenu;
+
 import com.amdocs.telecom.dto.CustomerRegistrationDTO;
 import com.amdocs.telecom.exception.TelecomException;
 import com.amdocs.telecom.model.*;
@@ -47,14 +49,8 @@ public class CustomerController {
     public void showLoginMenu() {
         boolean inPortal = true;
         while (inPortal) {
-            System.out.println("\n╔══════════════════════════════════════╗");
-            System.out.println("║       CUSTOMER LOGIN PORTAL          ║");
-            System.out.println("╠══════════════════════════════════════╣");
-            System.out.println("║  1. Login                            ║");
-            System.out.println("║  2. Register New Account             ║");
-            System.out.println("║  3. Forgot Password                  ║");
-            System.out.println("║  4. Back to Main Menu                ║");
-            System.out.println("╚══════════════════════════════════════╝");
+            ConsoleMenu.show("CUSTOMER LOGIN PORTAL", null,
+                    "1. Login", "2. Register New Account", "3. Forgot Password", "4. Back to Main Menu");
             System.out.print("Select option: ");
             if (!scanner.hasNextLine()) break;
 
@@ -86,7 +82,7 @@ public class CustomerController {
 
         // Check the account before requesting a password.
         if (!customerService.isUserRegistered(username)) {
-            System.out.println("❌ User '" + username + "' is not registered. Please register first or check your username/email.");
+            System.out.println("[Error] User '" + username + "' is not registered. Please register first or check your username/email.");
             return false;
         }
 
@@ -108,19 +104,20 @@ public class CustomerController {
             }
 
             if (cAttempt < 3) {
-                System.out.println("⚠️ CAPTCHA did not match. Let's generate a new one (Attempt " + (cAttempt + 1) + " of 3):");
+                System.out.println("[Warning] CAPTCHA did not match. Let's generate a new one (Attempt " + (cAttempt + 1) + " of 3):");
             } else {
-                System.out.println("❌ CAPTCHA verification failed 3 times. Returning to menu.");
+                System.out.println("[Error] CAPTCHA verification failed 3 times. Returning to menu.");
                 return false;
             }
         }
 
         try {
             loggedInCustomer = authService.login(username, password, expectedCaptcha, captchaInput);
-            System.out.println("\n✅ Login successful! Welcome, " + loggedInCustomer.getFullName());
+            System.out.println("\n[OK] Login successful! Welcome, " + loggedInCustomer.getFullName());
+            if (loggedInCustomer.getPreviousLogin()!=null) System.out.println("Last login: " + loggedInCustomer.getPreviousLogin());
             return true;
         } catch (Exception e) {
-            System.out.println("❌ " + e.getMessage());
+            System.out.println("[Error] " + e.getMessage());
             return false;
         }
     }
@@ -135,7 +132,7 @@ public class CustomerController {
             firstName = scanner.nextLine().trim();
             if ("cancel".equalsIgnoreCase(firstName)) return;
             if (firstName.isEmpty()) {
-                System.out.println("⚠️ First name cannot be empty. Please enter your first name.");
+                System.out.println("[Warning] First name cannot be empty. Please enter your first name.");
             }
         }
 
@@ -145,7 +142,7 @@ public class CustomerController {
             lastName = scanner.nextLine().trim();
             if ("cancel".equalsIgnoreCase(lastName)) return;
             if (lastName.isEmpty()) {
-                System.out.println("⚠️ Last name cannot be empty. Please enter your last name.");
+                System.out.println("[Warning] Last name cannot be empty. Please enter your last name.");
             }
         }
 
@@ -157,16 +154,16 @@ public class CustomerController {
             try {
                 dob = LocalDate.parse(dobStr, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
                 if (!ValidationUtil.isEligibleAge(dob, 18)) {
-                    System.out.println("⚠️ Customer must be at least 18 years old. (Attempt " + attempt + " of 3)");
+                    System.out.println("[Warning] Customer must be at least 18 years old. (Attempt " + attempt + " of 3)");
                     dob = null;
                 } else {
                     break;
                 }
             } catch (Exception e) {
-                System.out.println("⚠️ Invalid date format. Please format as yyyy-MM-dd (e.g. 2000-01-15). (Attempt " + attempt + " of 3)");
+                System.out.println("[Warning] Invalid date format. Please format as yyyy-MM-dd (e.g. 2000-01-15). (Attempt " + attempt + " of 3)");
             }
             if (attempt == 3) {
-                System.out.println("❌ Maximum attempts reached for Date of Birth. Registration cancelled.");
+                System.out.println("[Error] Maximum attempts reached for Date of Birth. Registration cancelled.");
                 return;
             }
         }
@@ -177,12 +174,12 @@ public class CustomerController {
             email = scanner.nextLine().trim();
             if ("cancel".equalsIgnoreCase(email)) return;
             if (!ValidationUtil.isValidEmail(email)) {
-                System.out.println("⚠️ Invalid email format (example: name@domain.com). (Attempt " + attempt + " of 3)");
+                System.out.println("[Warning] Invalid email format (example: name@domain.com). (Attempt " + attempt + " of 3)");
             } else {
                 break;
             }
             if (attempt == 3) {
-                System.out.println("❌ Maximum attempts reached for Email. Registration cancelled.");
+                System.out.println("[Error] Maximum attempts reached for Email. Registration cancelled.");
                 return;
             }
         }
@@ -193,12 +190,12 @@ public class CustomerController {
             mobile = scanner.nextLine().trim();
             if ("cancel".equalsIgnoreCase(mobile)) return;
             if (!ValidationUtil.isValidMobile(mobile)) {
-                System.out.println("⚠️ Invalid mobile format. Must be 10 to 15 digits (e.g. 9876543210). (Attempt " + attempt + " of 3)");
+                System.out.println("[Warning] Invalid mobile format. Must be 10 to 15 digits (e.g. 9876543210). (Attempt " + attempt + " of 3)");
             } else {
                 break;
             }
             if (attempt == 3) {
-                System.out.println("❌ Maximum attempts reached for Mobile. Registration cancelled.");
+                System.out.println("[Error] Maximum attempts reached for Mobile. Registration cancelled.");
                 return;
             }
         }
@@ -224,7 +221,7 @@ public class CustomerController {
             username = scanner.nextLine().trim();
             if ("cancel".equalsIgnoreCase(username)) return;
             if (username.isEmpty()) {
-                System.out.println("⚠️ Username cannot be empty.");
+                System.out.println("[Warning] Username cannot be empty.");
             }
         }
 
@@ -239,14 +236,14 @@ public class CustomerController {
                 break; // Valid password!
             }
 
-            System.out.println("⚠️ Password does not meet requirements:");
+            System.out.println("[Warning] Password does not meet requirements:");
             for (String req : missing) {
                 System.out.println("   • " + req);
             }
             if (attempt < 3) {
                 System.out.println("   Please try again (Attempt " + (attempt + 1) + " of 3):");
             } else {
-                System.out.println("❌ Maximum attempts reached for password entry. Registration cancelled.");
+                System.out.println("[Error] Maximum attempts reached for password entry. Registration cancelled.");
                 return;
             }
         }
@@ -255,12 +252,12 @@ public class CustomerController {
             CustomerRegistrationDTO dto = new CustomerRegistrationDTO(firstName, lastName, dob,
                     email, mobile, address, city, country, username, password);
             Customer registered = customerService.registerCustomer(dto);
-            System.out.println("\n✅ Registration successful!");
+            System.out.println("\n[OK] Registration successful!");
             System.out.println("   Customer ID     : " + registered.getCustomerNumber());
             System.out.println("   Name            : " + registered.getFullName());
             System.out.println("   Username        : " + registered.getUsername());
 
-            System.out.print("\nWould you like to log in now? (Y/N): ");
+            System.out.print("\nWould you like to log in now (Y/N): ");
             String ans = scanner.nextLine().trim();
             if ("Y".equalsIgnoreCase(ans)) {
                 if (handleLogin(registered.getUsername())) {
@@ -268,7 +265,7 @@ public class CustomerController {
                 }
             }
         } catch (Exception e) {
-            System.out.println("❌ Registration failed: " + e.getMessage());
+            System.out.println("[Error] Registration failed: " + e.getMessage());
         }
     }
 
@@ -280,7 +277,7 @@ public class CustomerController {
 
         try {
             String otp = authService.initiatePasswordRecovery(username);
-            System.out.println("📧 OTP sent (simulated): " + otp);
+            System.out.println(" OTP sent (simulated): " + otp);
 
             String otpInput = "";
             boolean otpValid = false;
@@ -293,9 +290,9 @@ public class CustomerController {
                     break;
                 }
                 if (attempt < 3) {
-                    System.out.println("⚠️ Incorrect OTP. Please try again (Attempt " + (attempt + 1) + " of 3):");
+                    System.out.println("[Warning] Incorrect OTP. Please try again (Attempt " + (attempt + 1) + " of 3):");
                 } else {
-                    System.out.println("❌ OTP verification failed. Password reset cancelled.");
+                    System.out.println("[Error] OTP verification failed. Password reset cancelled.");
                     return;
                 }
             }
@@ -312,82 +309,179 @@ public class CustomerController {
                 if (missing.isEmpty()) {
                     break;
                 }
-                System.out.println("⚠️ Password does not meet requirements:");
+                System.out.println("[Warning] Password does not meet requirements:");
                 for (String req : missing) {
                     System.out.println("   • " + req);
                 }
                 if (attempt < 3) {
                     System.out.println("   Please try again (Attempt " + (attempt + 1) + " of 3):");
                 } else {
-                    System.out.println("❌ Maximum attempts reached. Password reset cancelled.");
+                    System.out.println("[Error] Maximum attempts reached. Password reset cancelled.");
                     return;
                 }
             }
 
             boolean success = authService.completePasswordRecovery(username, otpInput, newPassword);
             if (success) {
-                System.out.println("✅ Password reset successful! Please login with your new password.");
+                System.out.println("[OK] Password reset successful! Please login with your new password.");
             } else {
-                System.out.println("❌ Password reset failed.");
+                System.out.println("[Error] Password reset failed.");
             }
         } catch (Exception e) {
-            System.out.println("❌ " + e.getMessage());
+            System.out.println("[Error] " + e.getMessage());
         }
     }
 
     private void showCustomerDashboard() {
         boolean running = true;
         while (running) {
-            System.out.println("\n╔══════════════════════════════════════╗");
-            System.out.println("║       CUSTOMER DASHBOARD             ║");
-            System.out.println("║  Welcome: " + padRight(loggedInCustomer.getFullName(), 25) + " ║");
-            System.out.println("╠══════════════════════════════════════╣");
-            System.out.println("║  1.  View My Profile                 ║");
-            System.out.println("║  2.  Browse Available Plans          ║");
-            System.out.println("║  3.  Search Plans by Name            ║");
-            System.out.println("║  4.  Filter Plans by Price           ║");
-            System.out.println("║  5.  My Subscriptions                ║");
-            System.out.println("║  6.  Subscribe to a Plan             ║");
-            System.out.println("║  7.  Change Plan                     ║");
-            System.out.println("║  8.  View My Bills                   ║");
-            System.out.println("║  9.  Make a Payment                  ║");
-            System.out.println("║  10. View Usage History              ║");
-            System.out.println("║  11. Raise a Complaint               ║");
-            System.out.println("║  12. Track Complaints & Solutions    ║");
-            System.out.println("║  13. View Notifications              ║");
-            System.out.println("║  14. Logout                          ║");
-            System.out.println("╚══════════════════════════════════════╝");
+            ConsoleMenu.showCompact("CUSTOMER DASHBOARD", "Welcome: " + loggedInCustomer.getFullName(),
+                    "1. My Profile", "2. Explore Plans", "3. My Subscriptions",
+                    "4. Subscribe to a Plan", "5. Change Plan", "6. Manage Add-ons",
+                    "7. View Bills", "8. Make a Payment", "9. Usage",
+                    "10. Raise a Complaint", "11. Track Complaints", "12. Notifications",
+                    "", "0. Logout");
             System.out.print("Select option: ");
             if (!scanner.hasNextLine()) break;
 
             int choice = readInt();
-            switch (choice) {
-                case 1 -> viewProfile();
-                case 2 -> browsePlans();
-                case 3 -> searchPlans();
-                case 4 -> filterPlansByPrice();
-                case 5 -> viewSubscriptions();
-                case 6 -> subscribeToPlan();
-                case 7 -> changePlan();
-                case 8 -> viewBills();
-                case 9 -> makePayment();
-                case 10 -> viewUsage();
-                case 11 -> raiseComplaint();
-                case 12 -> trackCustomerComplaints();
-                case 13 -> viewNotifications();
-                case 14 -> {
+            try { switch (choice) {
+                case 1 -> profileMenu();
+                case 2 -> explorePlans();
+                case 3 -> viewSubscriptions();
+                case 4 -> subscribeToPlan();
+                case 5 -> changePlan();
+                case 6 -> manageAddOns();
+                case 7 -> viewBills();
+                case 8 -> makePayment();
+                case 9 -> usageMenu();
+                case 10 -> raiseComplaint();
+                case 11 -> trackCustomerComplaints();
+                case 12 -> viewNotifications();
+                case 0 -> {
                     System.out.println("Logged out. Goodbye!");
+                    authService.logout(loggedInCustomer.getUsername());
                     loggedInCustomer = null;
                     running = false;
                 }
                 default -> System.out.println("Invalid option.");
+            } } catch (RuntimeException e) { System.out.println("Could not complete this action: " + e.getMessage()); }
+        }
+    }
+
+
+    private void manageAddOns() {
+        try {
+            AddOnService service=new AddOnServiceImpl();
+            viewSubscriptions();
+            System.out.print("Subscription ID (0 to return): "); int id=readInt(); if(id<=0) return;
+            List<AddOn> active = service.getSubscriptionAddOns(id, loggedInCustomer.getCustomerId());
+            System.out.println("\nACTIVE ADD-ONS");
+            if (active.isEmpty()) System.out.println("  No active add-ons for this subscription.");
+            active.forEach(a -> System.out.printf("  #%d  %s | Rs %.2f/month%n", a.id(), a.name(), a.monthlyPrice()));
+            System.out.println("\nAVAILABLE ADD-ONS");
+            service.getCatalogue().forEach(a -> System.out.printf("%d. %s - Rs %.2f/month%n",a.id(),a.name(),a.monthlyPrice()));
+            System.out.print("Add-on ID (0 to return): "); int addon=readInt(); if(addon<=0) return;
+            System.out.print("Activate or deactivate (A/D): "); String action=scanner.nextLine().trim();
+            if(!action.equalsIgnoreCase("A") && !action.equalsIgnoreCase("D")) { System.out.println("Choose A or D."); return; }
+            service.setActive(id,addon,loggedInCustomer.getCustomerId(),action.equalsIgnoreCase("A"));
+            System.out.println("Add-on updated. Prorated charges appear in My Bills; credits apply to the next monthly bill.");
+        } catch(Exception e) { System.out.println(e.getMessage()); }
+    }
+
+    private void monthlyUsage() {
+        try {
+            System.out.print("Billing month (yyyy-MM): "); String month=scanner.nextLine().trim();
+            Map<String,Double> totals=usageService.getCustomerMonthlySummary(loggedInCustomer.getCustomerId(),month);
+            totals.forEach((type,value) -> System.out.printf("%s: %.2f %s%n",type,value,com.amdocs.telecom.util.UsageUnits.unit(UsageType.valueOf(type))));
+            if(totals.isEmpty()) System.out.println("No usage in this month.");
+        } catch(Exception e) { System.out.println("Could not load monthly usage: " + e.getMessage()); }
+    }
+
+    private String profileValue(String label,String current) {
+        System.out.print(label+" ["+current+"]: "); String value=scanner.nextLine().trim(); return value.isEmpty()?current:value;
+    }
+    private void updateProfile() {
+        try {
+            Customer c=customerService.getCustomerById(loggedInCustomer.getCustomerId());
+            c.setFirstName(profileValue("First name",c.getFirstName())); c.setLastName(profileValue("Last name",c.getLastName()));
+            c.setAddress(profileValue("Address",c.getAddress())); c.setCity(profileValue("City",c.getCity())); c.setCountry(profileValue("Country",c.getCountry()));
+            customerService.updateProfile(c); loggedInCustomer=c; System.out.println("Profile updated.");
+        } catch(Exception e) { System.out.println(e.getMessage()); }
+    }
+    private void profileMenu() {
+        ConsoleMenu.show("MY PROFILE", null, "1. View Profile", "2. Edit Profile", "0. Back");
+        System.out.print("Profile option: ");
+        switch (readInt()) {
+            case 1 -> viewProfile();
+            case 2 -> updateProfile();
+            case 0 -> { }
+            default -> System.out.println("Invalid option.");
+        }
+    }
+
+    private void usageMenu() {
+        ConsoleMenu.show("USAGE", null, "1. Usage History (all dates)", "2. Monthly Usage Summary", "0. Back");
+        System.out.print("Usage option: ");
+        switch (readInt()) {
+            case 1 -> viewUsage();
+            case 2 -> monthlyUsage();
+            case 0 -> { }
+            default -> System.out.println("Invalid option.");
+        }
+    }
+
+    private void explorePlans() {
+        ConsoleMenu.show("EXPLORE PLANS", null,
+                "1. View All Available Plans", "2. Search by Name", "3. Filter by Maximum Price",
+                "4. Filter by Price Range", "5. Filter by Minimum Data", "6. Sort by Price",
+                "7. Compare Two Plans", "0. Back");
+        System.out.print("Plan option: ");
+        try {
+            List<TelecomPlan> plans;
+            switch (readInt()) {
+                case 0 -> { return; }
+                case 1 -> { browsePlans(); return; }
+                case 2 -> { searchPlans(); return; }
+                case 3 -> { filterPlansByPrice(); return; }
+                case 4 -> {
+                    System.out.print("Minimum price: ");
+                    double min = Double.parseDouble(scanner.nextLine().trim());
+                    System.out.print("Maximum price: ");
+                    plans = planService.filterPlansByPriceRange(min, Double.parseDouble(scanner.nextLine().trim()));
+                }
+                case 5 -> {
+                    System.out.print("Minimum GB: ");
+                    plans = planService.filterPlansByMinData(readInt());
+                }
+                case 6 -> {
+                    System.out.print("Sort order (A = ascending, D = descending): ");
+                    String order = scanner.nextLine().trim();
+                    if (!order.equalsIgnoreCase("A") && !order.equalsIgnoreCase("D")) {
+                        System.out.println("Choose A or D.");
+                        return;
+                    }
+                    plans = planService.sortPlansByPrice(order.equalsIgnoreCase("A"));
+                }
+                case 7 -> {
+                    browsePlans();
+                    System.out.print("First plan ID: ");
+                    int first = readInt();
+                    System.out.print("Second plan ID: ");
+                    plans = planService.comparePlans(first, readInt());
+                }
+                default -> { System.out.println("Invalid option."); return; }
             }
+            if (plans.isEmpty()) System.out.println("No matching plans found.");
+            plans.forEach(System.out::println);
+        } catch (Exception e) {
+            System.out.println("Could not load plans: " + e.getMessage());
         }
     }
 
     private void viewProfile() {
         Customer c = loggedInCustomer;
-        System.out.println("\n┌─── MY PROFILE ──────────────────────┐");
+        System.out.println("\nMY PROFILE");
         System.out.println("  Customer No : " + c.getCustomerNumber());
         System.out.println("  Name        : " + c.getFullName());
         System.out.println("  DOB         : " + c.getDateOfBirth());
@@ -397,27 +491,28 @@ public class CustomerController {
         System.out.println("  City        : " + c.getCity());
         System.out.println("  Country     : " + c.getCountry());
         System.out.println("  Status      : " + c.getAccountStatus());
-        System.out.println("  Registered  : " + c.getRegistrationDate());
-        System.out.println("└──────────────────────────────────────┘");
+        System.out.println("  Registered  : " + (c.getRegistrationDate() == null ? "N/A"
+                : c.getRegistrationDate().format(DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm"))));
+        System.out.println("------------------------------------------------------------");
     }
 
     private void browsePlans() {
-        System.out.println("\n┌─── AVAILABLE TELECOM PLANS ─────────┐");
+        System.out.println("\nAVAILABLE TELECOM PLANS");
         List<TelecomPlan> plans = planService.getAllActivePlans();
         if (plans.isEmpty()) {
             System.out.println("  No active plans available.");
         } else {
-            System.out.printf("  %-5s %-10s %-16s %-8s %6s %10s %-10s ₹%s%n",
+            System.out.printf("  %-5s %-10s %-16s %-8s %6s %10s %-10s Rs %s%n",
                     "ID", "Code", "Name", "Type", "Data", "Voice", "Roaming", "Price");
             System.out.println("  " + "-".repeat(85));
             for (TelecomPlan p : plans) {
-                System.out.printf("  %-5d %-10s %-16s %-8s %4dGB %10s %-10s ₹%.2f%n",
+                System.out.printf("  %-5d %-10s %-16s %-8s %4dGB %10s %-10s Rs %.2f%n",
                         p.getPlanId(), p.getPlanCode(), p.getPlanName(), p.getPlanType(),
                         p.getDataAllowanceGB(), p.getVoiceDisplay(),
                         p.isInternationalRoaming() ? "Yes" : "No", p.getMonthlyRental());
             }
         }
-        System.out.println("└──────────────────────────────────────┘");
+        System.out.println("------------------------------------------------------------");
     }
 
     private void searchPlans() {
@@ -429,16 +524,16 @@ public class CustomerController {
     }
 
     private void filterPlansByPrice() {
-        System.out.print("Enter maximum monthly price (₹): ");
+        System.out.print("Enter maximum monthly price (Rs ): ");
         double max = readDouble();
         List<TelecomPlan> results = planService.filterPlansByMaxPrice(max);
-        System.out.println("Plans within ₹" + max + ":");
+        System.out.println("Plans within Rs " + max + ":");
         results.forEach(p -> System.out.println("  " + p));
     }
 
     private void viewSubscriptions() {
         List<MobileSubscription> subs = subscriptionService.getCustomerSubscriptions(loggedInCustomer.getCustomerId());
-        System.out.println("\n┌─── MY SUBSCRIPTIONS ────────────────┐");
+        System.out.println("\nMY SUBSCRIPTIONS");
         if (subs.isEmpty()) {
             System.out.println("  No active subscriptions.");
         } else {
@@ -446,7 +541,7 @@ public class CustomerController {
                 System.out.println("  " + s);
             }
         }
-        System.out.println("└──────────────────────────────────────┘");
+        System.out.println("------------------------------------------------------------");
     }
 
     private void subscribeToPlan() {
@@ -464,7 +559,7 @@ public class CustomerController {
 
         try {
             MobileSubscription sub = subscriptionService.subscribeToPlan(loggedInCustomer.getCustomerId(), planId, simType);
-            System.out.println("\n✅ Subscription created successfully!");
+            System.out.println("\n[OK] Subscription created successfully!");
             System.out.println("   Subscription No : " + sub.getSubscriptionNumber());
             System.out.println("   Mobile Number   : " + sub.getMobileNumber());
             System.out.println("   SIM Type        : " + simType);
@@ -483,35 +578,35 @@ public class CustomerController {
 
             if (newBill != null) {
                 System.out.println("\n--- Initial Bill Generated ---");
-                System.out.printf("Bill No: %s | Total Amount: ₹%.2f (Rental: ₹%.2f + 18%% GST: ₹%.2f)%n",
+                System.out.printf("Bill No: %s | Total Amount: Rs %.2f (Rental: Rs %.2f + 18%% GST: Rs %.2f)%n",
                         newBill.getBillNumber(), newBill.getTotalAmount(), newBill.getPlanRental(), newBill.getTaxAmount());
-                System.out.print("Proceed to pay now with UPI/Card to activate your plan? (Y/N, Default: Y): ");
+                System.out.print("Proceed to pay now with UPI/Card to activate your plan (Y/N, Default: Y): ");
                 String payNow = scanner.nextLine().trim();
                 if (!"N".equalsIgnoreCase(payNow)) {
                     executePaymentWithMethod(newBill, "NEW PLAN PURCHASE / SUBSCRIPTION", planName, sub.getMobileNumber());
                 } else {
-                    System.out.println("⚠️ Payment pending. You can pay anytime via Option 9 (Make a Payment).");
+                    System.out.println("[Warning] Payment pending. You can pay anytime via Option 8 (Make a Payment).");
                     printConsoleReceipt(newBill, null, "NEW PLAN PURCHASE / SUBSCRIPTION (PENDING PAYMENT)", planName, sub.getMobileNumber(), "PENDING");
                     offerDownloadInvoice(newBill, null, planName, sub.getMobileNumber(), "PENDING");
                 }
             }
         } catch (TelecomException e) {
-            System.out.println("❌ " + e.getMessage());
+            System.out.println("[Error] " + e.getMessage());
         }
     }
 
     private void changePlan() {
         List<MobileSubscription> subs = subscriptionService.getCustomerSubscriptions(loggedInCustomer.getCustomerId());
-        System.out.println("\n┌─── MY SUBSCRIPTIONS ────────────────┐");
+        System.out.println("\nMY SUBSCRIPTIONS");
         if (subs.isEmpty()) {
             System.out.println("  No active subscriptions found.");
-            System.out.println("└──────────────────────────────────────┘");
+            System.out.println("------------------------------------------------------------");
             return;
         }
         for (MobileSubscription s : subs) {
             System.out.println(s);
         }
-        System.out.println("└──────────────────────────────────────┘");
+        System.out.println("------------------------------------------------------------");
 
         System.out.print("Enter Subscription No (e.g. SUB82339), Mobile No, or ID (or 'cancel'): ");
         String input = scanner.nextLine().trim();
@@ -525,7 +620,7 @@ public class CustomerController {
         ).findFirst().orElse(null);
 
         if (target == null) {
-            System.out.println("❌ Could not find a subscription matching: " + input);
+            System.out.println("[Error] Could not find a subscription matching: " + input);
             return;
         }
 
@@ -539,7 +634,7 @@ public class CustomerController {
                 boolean success = subscriptionService.changePlan(target.getSubscriptionId(), newPlanId,
                     loggedInCustomer.getCustomerId(), loggedInCustomer.getUsername());
             if (success) {
-                System.out.println("✅ Plan changed successfully for " + target.getSubscriptionNumber() + " (" + target.getMobileNumber() + ")!");
+                System.out.println("[OK] Plan changed successfully for " + target.getSubscriptionNumber() + " (" + target.getMobileNumber() + ")!");
 
                 TelecomPlan newPlan = null;
                 try {
@@ -550,14 +645,18 @@ public class CustomerController {
                 try {
                     Bill changeBill = billingService.generatePlanChangeBill(target.getSubscriptionId(), newPlanId);
                     System.out.println("\n--- Plan Change Invoice Generated ---");
-                    System.out.printf("Bill No: %s | Total Amount: ₹%.2f (Rental: ₹%.2f + 18%% GST: ₹%.2f)%n",
+                    System.out.printf("Bill No: %s | Total Amount: Rs %.2f (Rental: Rs %.2f + 18%% GST: Rs %.2f)%n",
                             changeBill.getBillNumber(), changeBill.getTotalAmount(), changeBill.getPlanRental(), changeBill.getTaxAmount());
-                    System.out.print("Proceed to pay now with UPI/Card for plan activation? (Y/N, Default: Y): ");
+                    if (changeBill.getTotalAmount()==0) {
+                        System.out.println("No additional payment is due. Any downgrade credit will apply to your next monthly bill.");
+                        return;
+                    }
+                    System.out.print("Proceed to pay now with UPI/Card (Y/N, Default: Y): ");
                     String payNow = scanner.nextLine().trim();
                     if (!"N".equalsIgnoreCase(payNow)) {
                         executePaymentWithMethod(changeBill, "PLAN CHANGE / UPGRADE", newPlanName, target.getMobileNumber());
                     } else {
-                        System.out.println("⚠️ Payment pending. You can pay anytime via Option 9 (Make a Payment).");
+                        System.out.println("[Warning] Payment pending. You can pay anytime via Option 8 (Make a Payment).");
                         printConsoleReceipt(changeBill, null, "PLAN CHANGE / UPGRADE (PENDING PAYMENT)", newPlanName, target.getMobileNumber(), "PENDING");
                         offerDownloadInvoice(changeBill, null, newPlanName, target.getMobileNumber(), "PENDING");
                     }
@@ -566,23 +665,23 @@ public class CustomerController {
                 }
             }
         } catch (TelecomException e) {
-            System.out.println("❌ " + e.getMessage());
+            System.out.println("[Error] " + e.getMessage());
         }
     }
 
     private void viewBills() {
         List<Bill> bills = billingService.getCustomerBills(loggedInCustomer.getCustomerId());
-        System.out.println("\n┌─── MY BILLS ────────────────────────┐");
+        System.out.println("\nMY BILLS");
         if (bills.isEmpty()) {
             System.out.println("  No bills found.");
-            System.out.println("└──────────────────────────────────────┘");
+            System.out.println("------------------------------------------------------------");
             return;
         }
 
         for (Bill b : bills) {
             System.out.println("  " + b);
         }
-        System.out.println("└──────────────────────────────────────┘");
+        System.out.println("------------------------------------------------------------");
 
         System.out.print("\nEnter Bill Number or ID to view full invoice on console (or 0 to return): ");
         String bChoice = scanner.nextLine().trim();
@@ -595,7 +694,7 @@ public class CustomerController {
                 printConsoleReceipt(selected, null, "ACCOUNT BILL INVOICE", "Telecom Subscription Plan", selected.getMobileNumber(), selected.getBillStatus());
                 offerDownloadInvoice(selected, null, "Telecom Subscription Plan", selected.getMobileNumber(), selected.getBillStatus());
             } else {
-                System.out.println("❌ Bill not found.");
+                System.out.println("[Error] Bill not found.");
             }
         }
     }
@@ -607,21 +706,21 @@ public class CustomerController {
             return;
         }
 
-        System.out.println("\n┌─── PENDING BILLS ───────────────────┐");
+        System.out.println("\nPENDING BILLS");
         boolean hasUnpaid = false;
         for (Bill b : bills) {
             if (!"PAID".equalsIgnoreCase(b.getBillStatus())) {
-                System.out.printf("  Bill #%d [%s] - Due: %s - Total: ₹%.2f - Status: %s%n",
+                System.out.printf("  Bill #%d [%s] - Due: %s - Total: Rs %.2f - Status: %s%n",
                         b.getBillId(), b.getBillNumber(), b.getDueDate(), b.getTotalAmount(), b.getBillStatus());
                 hasUnpaid = true;
             }
         }
         if (!hasUnpaid) {
             System.out.println("  All your bills are already PAID! No payments due.");
-            System.out.println("└──────────────────────────────────────┘");
+            System.out.println("------------------------------------------------------------");
             return;
         }
-        System.out.println("└──────────────────────────────────────┘");
+        System.out.println("------------------------------------------------------------");
 
         System.out.print("Enter Bill Number (e.g. BILL-1001) or Bill ID to pay (or 'cancel'): ");
         String billInput = scanner.nextLine().trim();
@@ -633,11 +732,11 @@ public class CustomerController {
         ).findFirst().orElse(null);
 
         if (target == null) {
-            System.out.println("❌ Bill '" + billInput + "' not found.");
+            System.out.println("[Error] Bill '" + billInput + "' not found.");
             return;
         }
         if ("PAID".equalsIgnoreCase(target.getBillStatus())) {
-            System.out.println("⚠️ This bill is already PAID.");
+            System.out.println("[Warning] This bill is already PAID.");
             return;
         }
 
@@ -645,16 +744,24 @@ public class CustomerController {
     }
 
     private Payment executePaymentWithMethod(Bill target, String transactionType, String planName, String mobileNumber) {
-        System.out.println("\n┌─── PAYMENT CHECKOUT ────────────────┐");
+        System.out.println("\nPAYMENT CHECKOUT");
         System.out.printf("  Invoice Number: %s%n", target.getBillNumber());
-        System.out.printf("  Total Amount  : ₹%.2f%n", target.getTotalAmount());
+        System.out.printf("  Total Amount  : Rs %.2f%n", target.getTotalAmount());
         System.out.println("  Select Payment Method:");
         System.out.println("    1. UPI (Google Pay, PhonePe, Paytm, BHIM)");
         System.out.println("    2. Credit / Debit Card (Visa, Mastercard, RuPay)");
         System.out.println("    3. Net Banking");
-        System.out.println("└──────────────────────────────────────┘");
-        System.out.print("Enter choice (1-3, Default: 1): ");
+        System.out.println("    4. Bank Transfer (simulated)");
+        System.out.println("    0. Cancel");
+        System.out.println("------------------------------------------------------------");
+        System.out.print("Enter choice (0-4, Default: 1): ");
         String modeChoice = scanner.nextLine().trim();
+        if ("0".equals(modeChoice) || "cancel".equalsIgnoreCase(modeChoice)) return null;
+        if (!java.util.Set.of("", "1", "2", "3", "4", "upi", "card", "netbanking", "bank_transfer")
+                .contains(modeChoice.toLowerCase(java.util.Locale.ROOT))) {
+            System.out.println("[Error] Invalid payment method.");
+            return null;
+        }
 
         String paymentMode = "UPI";
         String paymentInstrumentDetail = "UPI";
@@ -672,21 +779,21 @@ public class CustomerController {
             String cvv = scanner.nextLine().trim();
 
             if (!cardNum.matches("\\d{16}")) {
-                System.out.println("❌ Card number must contain exactly 16 digits.");
+                System.out.println("[Error] Card number must contain exactly 16 digits.");
                 return null;
             }
             if (!expiry.matches("(0[1-9]|1[0-2])/\\d{2}")) {
-                System.out.println("❌ Card expiry must use MM/YY format.");
+                System.out.println("[Error] Card expiry must use MM/YY format.");
                 return null;
             }
             int expiryYear = 2000 + Integer.parseInt(expiry.substring(3));
             int expiryMonth = Integer.parseInt(expiry.substring(0, 2));
             if (YearMonth.of(expiryYear, expiryMonth).isBefore(YearMonth.now())) {
-                System.out.println("❌ Card has expired.");
+                System.out.println("[Error] Card has expired.");
                 return null;
             }
             if (!cvv.matches("\\d{3,4}")) {
-                System.out.println("❌ CVV must contain 3 or 4 digits.");
+                System.out.println("[Error] CVV must contain 3 or 4 digits.");
                 return null;
             }
 
@@ -696,7 +803,7 @@ public class CustomerController {
             paymentInstrumentDetail = "Card (" + maskedCard + ", Exp: " + expiry + ")";
 
             System.out.println("  Connecting to Card Payment Gateway...");
-            System.out.println("  [✓] Card authorization successful!");
+            System.out.println("  [OK] Card authorization successful!");
 
         } else if ("3".equals(modeChoice) || "netbanking".equalsIgnoreCase(modeChoice)) {
             paymentMode = "NET_BANKING";
@@ -717,8 +824,11 @@ public class CustomerController {
             };
             paymentInstrumentDetail = "Net Banking (" + bankName + ")";
             System.out.println("  Connecting to Net Banking Gateway (" + bankName + ")...");
-            System.out.println("  [✓] Bank authentication successful!");
+            System.out.println("  [OK] Bank authentication successful!");
 
+        } else if ("4".equals(modeChoice) || "bank_transfer".equalsIgnoreCase(modeChoice)) {
+            paymentMode = "BANK_TRANSFER";
+            paymentInstrumentDetail = "Bank Transfer (simulated)";
         } else {
             paymentMode = "UPI";
             System.out.print("Enter your UPI ID (e.g. " + loggedInCustomer.getUsername() + "@oksbi / 9876543210@upi): ");
@@ -727,12 +837,12 @@ public class CustomerController {
                 upiId = loggedInCustomer.getUsername() + "@oksbi";
             }
             if (!upiId.matches("[A-Za-z0-9._-]+@[A-Za-z0-9.-]+")) {
-                System.out.println("❌ Invalid UPI ID format.");
+                System.out.println("[Error] Invalid UPI ID format.");
                 return null;
             }
             paymentInstrumentDetail = "UPI (ID: " + upiId + ")";
             System.out.println("  Sending payment request to UPI ID: " + upiId + " ...");
-            System.out.println("  [✓] UPI payment authorized successfully!");
+            System.out.println("  [OK] UPI payment authorized successfully!");
         }
 
         try {
@@ -749,19 +859,19 @@ public class CustomerController {
             return payment;
 
         } catch (TelecomException e) {
-            System.out.println("❌ Payment Failed: " + e.getMessage());
+            System.out.println("[Error] Payment Failed: " + e.getMessage());
             return null;
         }
     }
 
     private void offerDownloadInvoice(Bill bill, Payment payment, String planName, String mobileNumber, String paymentDetail) {
-        System.out.println("┌─── DOWNLOAD INVOICE OPTIONS ────────┐");
+        System.out.println("DOWNLOAD INVOICE OPTIONS");
         System.out.println("  1. Download as PDF (.pdf)");
         System.out.println("  2. Download as Printable HTML (.html)");
         System.out.println("  3. Download as Formatted Text (.txt)");
         System.out.println("  4. Download All Formats (PDF + HTML + Text)");
         System.out.println("  5. Skip (Console only)");
-        System.out.println("└──────────────────────────────────────┘");
+        System.out.println("------------------------------------------------------------");
         System.out.print("Select download option (1-5, Default: 5): ");
         String choice = scanner.nextLine().trim();
 
@@ -776,27 +886,27 @@ public class CustomerController {
         try {
             if ("1".equals(choice) || "pdf".equalsIgnoreCase(choice)) {
                 String pdfPath = reportGenerator.generateBillInvoicePdf(bill, loggedInCustomer, planName, payMode, txnRef, baseName + ".pdf");
-                System.out.println("✅ PDF Invoice downloaded successfully!");
-                System.out.println("   📄 File Path: " + pdfPath);
+                System.out.println("[OK] PDF Invoice downloaded successfully!");
+                System.out.println("    File Path: " + pdfPath);
             } else if ("2".equals(choice) || "html".equalsIgnoreCase(choice)) {
                 String htmlPath = reportGenerator.generateBillInvoiceHtml(bill, loggedInCustomer, planName, payMode, txnRef, baseName + ".html");
-                System.out.println("✅ Printable HTML Invoice downloaded successfully!");
-                System.out.println("   🌐 File Path: " + htmlPath);
+                System.out.println("[OK] Printable HTML Invoice downloaded successfully!");
+                System.out.println("    File Path: " + htmlPath);
             } else if ("3".equals(choice) || "txt".equalsIgnoreCase(choice)) {
                 String txtPath = reportGenerator.generateBillInvoiceText(bill, loggedInCustomer, planName, payMode, txnRef, baseName + ".txt");
-                System.out.println("✅ Text Invoice downloaded successfully!");
-                System.out.println("   📝 File Path: " + txtPath);
+                System.out.println("[OK] Text Invoice downloaded successfully!");
+                System.out.println("    File Path: " + txtPath);
             } else if ("4".equals(choice) || "all".equalsIgnoreCase(choice)) {
                 String pdfPath = reportGenerator.generateBillInvoicePdf(bill, loggedInCustomer, planName, payMode, txnRef, baseName + ".pdf");
                 String htmlPath = reportGenerator.generateBillInvoiceHtml(bill, loggedInCustomer, planName, payMode, txnRef, baseName + ".html");
                 String txtPath = reportGenerator.generateBillInvoiceText(bill, loggedInCustomer, planName, payMode, txnRef, baseName + ".txt");
-                System.out.println("✅ All invoice formats generated successfully!");
+                System.out.println("[OK] All invoice formats generated successfully!");
                 System.out.println("   • PDF  : " + pdfPath);
                 System.out.println("   • HTML : " + htmlPath);
                 System.out.println("   • Text : " + txtPath);
             }
         } catch (Exception e) {
-            System.out.println("❌ Failed to download invoice: " + e.getMessage());
+            System.out.println("[Error] Failed to download invoice: " + e.getMessage());
         }
     }
 
@@ -804,59 +914,59 @@ public class CustomerController {
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MMM-yyyy HH:mm:ss");
         String currentDateTime = java.time.LocalDateTime.now().format(dtf);
 
-        System.out.println("\n╔══════════════════════════════════════════════════════════════════════════════╗");
-        System.out.println("║                     TELECOM OFFICIAL INVOICE & RECEIPT                       ║");
-        System.out.println("║                           Powered by Amdocs TCSMS                            ║");
-        System.out.println("╠══════════════════════════════════════════════════════════════════════════════╣");
-        System.out.printf("║  Invoice / Bill No : %-55s ║%n", bill.getBillNumber());
-        System.out.printf("║  Date & Time       : %-55s ║%n", currentDateTime);
-        System.out.printf("║  Transaction Type  : %-55s ║%n", transactionType);
+        System.out.println("\n------------------------------------------------------------");
+        System.out.println("TELECOM OFFICIAL INVOICE & RECEIPT");
+        System.out.println("Powered by Amdocs TCSMS");
+        System.out.println("------------------------------------------------------------");
+        System.out.printf("Invoice / Bill No : %-55s %n", bill.getBillNumber());
+        System.out.printf("Date & Time       : %-55s %n", currentDateTime);
+        System.out.printf("Transaction Type  : %-55s %n", transactionType);
         if (payment != null) {
-            System.out.printf("║  Transaction Ref   : %-55s ║%n", payment.getTransactionReference());
+            System.out.printf("Transaction Ref   : %-55s %n", payment.getTransactionReference());
         }
-        System.out.println("╠══════════════════════════════════════════════════════════════════════════════╣");
-        System.out.println("║  CUSTOMER DETAILS                                                            ║");
-        System.out.printf("║  Customer ID       : %-55s ║%n", loggedInCustomer.getCustomerNumber());
-        System.out.printf("║  Customer Name     : %-55s ║%n", loggedInCustomer.getFullName());
-        System.out.printf("║  Mobile Number     : %-55s ║%n", (mobileNumber != null ? mobileNumber : loggedInCustomer.getMobileNumber()));
-        System.out.printf("║  Email Address     : %-55s ║%n", loggedInCustomer.getEmail());
-        System.out.printf("║  Address / City    : %-55s ║%n", loggedInCustomer.getAddress() + ", " + loggedInCustomer.getCity());
-        System.out.println("╠══════════════════════════════════════════════════════════════════════════════╣");
-        System.out.println("║  PURCHASE & PLAN DETAILS                                                     ║");
-        System.out.printf("║  Plan Name         : %-55s ║%n", (planName != null ? planName : "Telecom Plan"));
-        System.out.printf("║  Billing Cycle     : %-55s ║%n", bill.getBillingMonth());
-        System.out.printf("║  Payment Due Date  : %-55s ║%n", bill.getDueDate());
-        System.out.println("╠══════════════════════════════════════════════════════════════════════════════╣");
-        System.out.println("║  CHARGES BREAKDOWN                                                           ║");
-        System.out.printf("║    • Plan Monthly Rental                : ₹ %10.2f                       ║%n", bill.getPlanRental());
-        System.out.printf("║    • Usage / Add-on Charges             : ₹ %10.2f                       ║%n", bill.getUsageCharges());
-        System.out.printf("║    • Applicable Tax (18%% GST)          : ₹ %10.2f                       ║%n", bill.getTaxAmount());
+        System.out.println("------------------------------------------------------------");
+        System.out.println("CUSTOMER DETAILS");
+        System.out.printf("Customer ID       : %-55s %n", loggedInCustomer.getCustomerNumber());
+        System.out.printf("Customer Name     : %-55s %n", loggedInCustomer.getFullName());
+        System.out.printf("Mobile Number     : %-55s %n", (mobileNumber != null ? mobileNumber : loggedInCustomer.getMobileNumber()));
+        System.out.printf("Email Address     : %-55s %n", loggedInCustomer.getEmail());
+        System.out.printf("Address / City    : %-55s %n", loggedInCustomer.getAddress() + ", " + loggedInCustomer.getCity());
+        System.out.println("------------------------------------------------------------");
+        System.out.println("PURCHASE & PLAN DETAILS");
+        System.out.printf("Plan Name         : %-55s %n", (planName != null ? planName : "Telecom Plan"));
+        System.out.printf("Billing Cycle     : %-55s %n", bill.getBillingMonth());
+        System.out.printf("Payment Due Date  : %-55s %n", bill.getDueDate());
+        System.out.println("------------------------------------------------------------");
+        System.out.println("CHARGES BREAKDOWN");
+        System.out.printf("• Plan Monthly Rental                : Rs  %10.2f                       %n", bill.getPlanRental());
+        System.out.printf("• Usage / Add-on Charges             : Rs  %10.2f                       %n", bill.getUsageCharges());
+        System.out.printf("• Applicable Tax (18%% GST)          : Rs  %10.2f                       %n", bill.getTaxAmount());
         if (bill.getDiscount() > 0) {
-            System.out.printf("║    • Promotional Discount               : -₹%10.2f                       ║%n", bill.getDiscount());
+            System.out.printf("• Promotional Discount               : -Rs %10.2f                       %n", bill.getDiscount());
         }
-        System.out.println("║  ──────────────────────────────────────────────────────────────────────────  ║");
-        System.out.printf("║  NET TOTAL AMOUNT                       : ₹ %10.2f                       ║%n", bill.getTotalAmount());
-        System.out.println("╠══════════════════════════════════════════════════════════════════════════════╣");
-        System.out.println("║  PAYMENT INFORMATION                                                         ║");
+        System.out.println("------------------------------------------------------------");
+        System.out.printf("NET TOTAL AMOUNT                       : Rs  %10.2f                       %n", bill.getTotalAmount());
+        System.out.println("------------------------------------------------------------");
+        System.out.println("PAYMENT INFORMATION");
         if (payment != null) {
-            System.out.printf("║  Payment Status    : %-55s ║%n", "PAID (SUCCESS)");
-            System.out.printf("║  Payment Mode      : %-55s ║%n", payment.getPaymentMode());
-            System.out.printf("║  Payment Details   : %-55s ║%n", (paymentDetail != null ? paymentDetail : payment.getPaymentMode().toString()));
-            System.out.printf("║  Amount Paid       : ₹ %-53.2f ║%n", payment.getAmount());
-            System.out.printf("║  Paid Timestamp    : %-55s ║%n", (payment.getPaymentDate() != null ? payment.getPaymentDate().format(dtf) : currentDateTime));
+            System.out.printf("Payment Status    : %-55s %n", "PAID (SUCCESS)");
+            System.out.printf("Payment Mode      : %-55s %n", payment.getPaymentMode());
+            System.out.printf("Payment Details   : %-55s %n", (paymentDetail != null ? paymentDetail : payment.getPaymentMode().toString()));
+            System.out.printf("Amount Paid       : Rs  %-53.2f %n", payment.getAmount());
+            System.out.printf("Paid Timestamp    : %-55s %n", (payment.getPaymentDate() != null ? payment.getPaymentDate().format(dtf) : currentDateTime));
         } else {
             String status = "PAID".equalsIgnoreCase(bill.getBillStatus()) ? "PAID" : "UNPAID (Pending Payment)";
-            System.out.printf("║  Payment Status    : %-55s ║%n", status);
-            System.out.printf("║  Amount Due        : ₹ %-53.2f ║%n", bill.getTotalAmount());
-            System.out.printf("║  Payment Note      : %-55s ║%n", "Can be paid via Customer Dashboard -> Make a Payment");
+            System.out.printf("Payment Status    : %-55s %n", status);
+            System.out.printf("Amount Due        : Rs  %-53.2f %n", bill.getTotalAmount());
+            System.out.printf("Payment Note      : %-55s %n", "Can be paid via Customer Dashboard -> Make a Payment");
         }
-        System.out.println("╚══════════════════════════════════════════════════════════════════════════════╝");
+        System.out.println("------------------------------------------------------------");
         System.out.println("       Thank you for choosing Amdocs Telecom! This is an official console e-bill.\n");
     }
 
     private void viewUsage() {
         List<UsageRecord> usage = usageService.getCustomerUsageHistory(loggedInCustomer.getCustomerId());
-        System.out.println("\n┌─── USAGE HISTORY ───────────────────┐");
+        System.out.println("\nUSAGE HISTORY");
         if (usage.isEmpty()) {
             System.out.println("  No usage records found.");
         } else {
@@ -869,10 +979,10 @@ public class CustomerController {
             Map<String, Double> summary = usageService.getUsageSummary(sub.getSubscriptionId());
             if (!summary.isEmpty()) {
                 System.out.println("\n  Summary for " + sub.getSubscriptionNumber() + ":");
-                summary.forEach((type, qty) -> System.out.printf("    %-10s : %.1f%n", type, qty));
+                summary.forEach((type, qty) -> System.out.printf("    %-10s : %.1f %s%n", type, qty, com.amdocs.telecom.util.UsageUnits.unit(UsageType.valueOf(type))));
             }
         }
-        System.out.println("└──────────────────────────────────────┘");
+        System.out.println("------------------------------------------------------------");
     }
 
     private void raiseComplaint() {
@@ -897,30 +1007,30 @@ public class CustomerController {
         System.out.print("Describe the issue: ");
         String description = scanner.nextLine().trim();
         if (description.isEmpty()) {
-            System.out.println("⚠️ Description cannot be empty.");
+            System.out.println("[Warning] Description cannot be empty.");
             return;
         }
 
         try {
             Complaint complaint = complaintService.lodgeComplaint(loggedInCustomer.getCustomerId(), cat.name(), description);
 
-            System.out.println("\n✅ Complaint registered successfully!");
+            System.out.println("\n[OK] Complaint registered successfully!");
             System.out.println("   Ticket Number : " + complaint.getComplaintNumber());
             System.out.println("   Category      : " + complaint.getCategory());
             System.out.println("   Status        : " + complaint.getStatus());
-            System.out.println("💡 You can track status and view resolution at any time from Dashboard -> '12. Track Complaints & Solutions'.");
+            System.out.println("[Info] You can track status and view resolution at any time from Dashboard -> '11. Track Complaints'.");
         } catch (Exception e) {
-            System.out.println("❌ Error registering complaint: " + e.getMessage());
+            System.out.println("[Error] Error registering complaint: " + e.getMessage());
         }
     }
 
     private void trackCustomerComplaints() {
         List<Complaint> list = complaintService.getCustomerComplaints(loggedInCustomer.getCustomerId());
-        System.out.println("\n┌─── MY COMPLAINTS & SOLUTIONS ────────────────────────────────────────────────────────┐");
+        System.out.println("\nMY COMPLAINTS & SOLUTIONS");
         if (list.isEmpty()) {
             System.out.println("  You have not raised any complaints yet.");
-            System.out.println("  If you need help, please select Option 11 'Raise a Complaint'.");
-            System.out.println("└──────────────────────────────────────────────────────────────────────────────────────┘");
+            System.out.println("  If you need help, please select Option 10 'Raise a Complaint'.");
+            System.out.println("------------------------------------------------------------");
             return;
         }
 
@@ -933,7 +1043,7 @@ public class CustomerController {
         for (Complaint c : list) {
             String dateStr = c.getCreatedDate() != null ? c.getCreatedDate().format(dtf) : "N/A";
             String resStatus = (c.getResolution() != null && !c.getResolution().trim().isEmpty()) ?
-                    "✅ Solution Available" : "⏳ Under Review";
+                    "[OK] Solution Available" : "[Pending] Under Review";
             String statusBadge = switch (c.getStatus()) {
                 case "RESOLVED" -> "RESOLVED";
                 case "CLOSED" -> "CLOSED";
@@ -943,7 +1053,7 @@ public class CustomerController {
             System.out.printf("  %-3d %-12s %-16s %-10s %-8s %-12s %s%n",
                     index++, c.getComplaintNumber(), dateStr, c.getCategory(), c.getPriority(), statusBadge, resStatus);
         }
-        System.out.println("└──────────────────────────────────────────────────────────────────────────────────────┘");
+        System.out.println("------------------------------------------------------------");
 
         System.out.print("\nEnter Ticket Number or # (1-" + list.size() + ") to view complete solution details (or 0 to return): ");
         String input = scanner.nextLine().trim();
@@ -967,7 +1077,7 @@ public class CustomerController {
         }
 
         if (selected == null) {
-            System.out.println("❌ Complaint not found for: " + input);
+            System.out.println("[Error] Complaint not found for: " + input);
             return;
         }
 
@@ -978,53 +1088,53 @@ public class CustomerController {
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
         String dateStr = cp.getCreatedDate() != null ? cp.getCreatedDate().format(dtf) : "N/A";
         String statusSymbol = switch (cp.getStatus()) {
-            case "RESOLVED" -> "✅ RESOLVED (Issue Resolved)";
-            case "CLOSED" -> "🔒 CLOSED";
-            case "IN_PROGRESS" -> "⚙️ IN_PROGRESS (Investigation in Progress)";
-            default -> "⏳ OPEN (Pending Review)";
+            case "RESOLVED" -> "[OK] RESOLVED (Issue Resolved)";
+            case "CLOSED" -> " CLOSED";
+            case "IN_PROGRESS" -> " IN_PROGRESS (Investigation in Progress)";
+            default -> "[Pending] OPEN (Pending Review)";
         };
 
-        System.out.println("\n╔══════════════════════════════════════════════════════════════════════════╗");
-        System.out.println("║                 COMPLAINT STATUS & RESOLUTION CARD                       ║");
-        System.out.println("╠══════════════════════════════════════════════════════════════════════════╣");
-        System.out.printf("║  Ticket Number   : %-53s ║%n", cp.getComplaintNumber());
-        System.out.printf("║  Date Lodged     : %-53s ║%n", dateStr);
-        System.out.printf("║  Category        : %-53s ║%n", cp.getCategory());
-        System.out.printf("║  Priority        : %-53s ║%n", cp.getPriority());
-        System.out.printf("║  Current Status  : %-53s ║%n", statusSymbol);
-        System.out.println("╠══════════════════════════════════════════════════════════════════════════╣");
-        System.out.println("║  YOUR ISSUE DESCRIPTION:                                                 ║");
+        System.out.println("\n------------------------------------------------------------");
+        System.out.println("COMPLAINT STATUS & RESOLUTION CARD");
+        System.out.println("------------------------------------------------------------");
+        System.out.printf("Ticket Number   : %-53s %n", cp.getComplaintNumber());
+        System.out.printf("Date Lodged     : %-53s %n", dateStr);
+        System.out.printf("Category        : %-53s %n", cp.getCategory());
+        System.out.printf("Priority        : %-53s %n", cp.getPriority());
+        System.out.printf("Current Status  : %-53s %n", statusSymbol);
+        System.out.println("------------------------------------------------------------");
+        System.out.println("YOUR ISSUE DESCRIPTION:");
         printWrappedBoxTextCustomer(cp.getDescription(), 70);
-        System.out.println("╠══════════════════════════════════════════════════════════════════════════╣");
-        System.out.println("║  OFFICIAL RESOLUTION & SOLUTION:                                         ║");
+        System.out.println("------------------------------------------------------------");
+        System.out.println("OFFICIAL RESOLUTION & SOLUTION:");
         if (cp.getResolution() != null && !cp.getResolution().trim().isEmpty()) {
-            System.out.println("║  ✅ Action Taken / Solution:                                             ║");
+            System.out.println("[OK] Action Taken / Solution:");
             printWrappedBoxTextCustomer(cp.getResolution(), 70);
         } else {
-            System.out.println("║  ⏳ Under Review:                                                        ║");
-            System.out.println("║  Our technical and customer support team is actively investigating your  ║");
-            System.out.println("║  issue. A resolution will be posted here as soon as it is completed.     ║");
+            System.out.println("[Pending] Under Review:");
+            System.out.println("Our technical and customer support team is actively investigating your");
+            System.out.println("issue. A resolution will be posted here as soon as it is completed.");
         }
-        System.out.println("╚══════════════════════════════════════════════════════════════════════════╝");
+        System.out.println("------------------------------------------------------------");
     }
 
     private void printWrappedBoxTextCustomer(String text, int maxWidth) {
         if (text == null || text.trim().isEmpty()) {
-            System.out.println("║  (None)                                                                  ║");
+            System.out.println("(None)");
             return;
         }
         String[] words = text.split("\\s+");
         StringBuilder currentLine = new StringBuilder();
         for (String w : words) {
             if (currentLine.length() + w.length() + 1 > maxWidth) {
-                System.out.printf("║  %-70s ║%n", currentLine.toString());
+                System.out.printf("%-70s %n", currentLine.toString());
                 currentLine.setLength(0);
             }
             if (currentLine.length() > 0) currentLine.append(" ");
             currentLine.append(w);
         }
         if (currentLine.length() > 0) {
-            System.out.printf("║  %-70s ║%n", currentLine.toString());
+            System.out.printf("%-70s %n", currentLine.toString());
         }
     }
 
@@ -1032,7 +1142,7 @@ public class CustomerController {
         try {
             com.amdocs.telecom.dao.AuditAndNotificationDAO dao = new com.amdocs.telecom.dao.impl.AuditAndNotificationDAOImpl();
             List<Notification> notifs = dao.getNotificationsForCustomer(loggedInCustomer.getCustomerId());
-            System.out.println("\n┌─── NOTIFICATIONS ───────────────────┐");
+            System.out.println("\nNOTIFICATIONS");
             if (notifs.isEmpty()) {
                 System.out.println("  No notifications.");
             } else {
@@ -1040,9 +1150,9 @@ public class CustomerController {
                     System.out.println("  " + n);
                 }
             }
-            System.out.println("└──────────────────────────────────────┘");
+            System.out.println("------------------------------------------------------------");
         } catch (Exception e) {
-            System.out.println("❌ Error: " + e.getMessage());
+            System.out.println("[Error] Error: " + e.getMessage());
         }
     }
 
@@ -1066,8 +1176,4 @@ public class CustomerController {
         }
     }
 
-    private String padRight(String s, int n) {
-        if (s == null) s = "";
-        return String.format("%-" + n + "s", s.length() > n ? s.substring(0, n) : s);
-    }
 }

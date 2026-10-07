@@ -13,6 +13,7 @@ public class OTPService {
     private static class OtpEntry {
         String otp;
         LocalDateTime expiryTime;
+        int attempts;
 
         OtpEntry(String otp, LocalDateTime expiryTime) {
             this.otp = otp;
@@ -31,18 +32,14 @@ public class OTPService {
 
     public static boolean verifyOtp(String key, String enteredOtp) {
         if (key == null || enteredOtp == null) return false;
-        OtpEntry entry = otpStorage.get(key.toLowerCase());
-        if (entry == null) return false;
-
-        if (LocalDateTime.now().isAfter(entry.expiryTime)) {
-            otpStorage.remove(key.toLowerCase());
-            return false;
-        }
-
-        boolean valid = entry.otp.equals(enteredOtp.trim());
-        if (valid) {
-            otpStorage.remove(key.toLowerCase());
-        }
-        return valid;
+        String normalized=key.toLowerCase(java.util.Locale.ROOT);
+        java.util.concurrent.atomic.AtomicBoolean valid=new java.util.concurrent.atomic.AtomicBoolean();
+        otpStorage.computeIfPresent(normalized,(k,entry) -> {
+            if(LocalDateTime.now().isAfter(entry.expiryTime) || entry.attempts>=3) return null;
+            if(entry.otp.equals(enteredOtp.trim())) { valid.set(true); return null; }
+            entry.attempts++;
+            return entry.attempts>=3?null:entry;
+        });
+        return valid.get();
     }
 }

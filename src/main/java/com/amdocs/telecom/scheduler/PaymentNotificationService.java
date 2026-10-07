@@ -15,8 +15,8 @@ import java.util.logging.Logger;
 public class PaymentNotificationService {
 
     private static final Logger LOGGER = Logger.getLogger(PaymentNotificationService.class.getName());
-    private static final int QUEUE_CAPACITY = 1000; // FIX #3: Increased from 100 to handle burst loads
-    private static final long ENQUEUE_TIMEOUT_MS = 500; // FIX #3: Back-pressure timeout before fallback
+    private static final int QUEUE_CAPACITY = 1000;
+    private static final long ENQUEUE_TIMEOUT_MS = 500;
 
     private final BlockingQueue<Notification> notificationQueue;
     private final ExecutorService workerPool;
@@ -59,6 +59,7 @@ public class PaymentNotificationService {
         notif.setMessage(message);
         notif.setStatus("UNREAD");
 
+        if (!running) { executeEmergencyPersistence(notif); return; }
         boolean enqueued = false;
         try {
             // Wait up to 500 ms for queue space.
@@ -90,7 +91,7 @@ public class PaymentNotificationService {
     private void processNotification(Notification notif, int workerId) {
         try {
             notificationDAO.createNotification(notif);
-            System.out.println("  [NotificationWorker-" + workerId + "] Sent: \"" + notif.getTitle() + "\" to Customer ID " + notif.getCustomerId());
+            LOGGER.info("[NotificationWorker-" + workerId + "] Notification saved for Customer ID " + notif.getCustomerId());
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "[NotificationWorker-" + workerId + "] Failed to persist notification", e);
         }

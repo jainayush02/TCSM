@@ -4,6 +4,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public class Bill {
+    private String invoiceType = "MONTHLY";
+    private String invoiceKey;
+    public String getInvoiceType() { return invoiceType; }
+    public void setInvoiceType(String value) { invoiceType = value; }
+    public String getInvoiceKey() { return invoiceKey; }
+    public void setInvoiceKey(String value) { invoiceKey = value; }
     private int billId;
     private String billNumber;
     private int subscriptionId;
@@ -90,7 +96,7 @@ public class Bill {
 
     @Override
     public String toString() {
-        return String.format("  #%d [%s] Month: %s | Rental: ₹%.2f | Usage: ₹%.2f | Tax: ₹%.2f | Total: ₹%.2f | Due: %s | Status: %s",
+        return String.format("  #%d [%s] Month: %s | Rental: Rs %.2f | Usage: Rs %.2f | Tax: Rs %.2f | Total: Rs %.2f | Due: %s | Status: %s",
                 billId, billNumber, billingMonth, planRental, usageCharges, taxAmount, totalAmount, dueDate, billStatus);
     }
 }

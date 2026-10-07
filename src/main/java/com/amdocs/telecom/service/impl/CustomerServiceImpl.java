@@ -30,6 +30,14 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     public Customer registerCustomer(CustomerRegistrationDTO dto) throws ValidationException {
+        if (dto == null) throw new ValidationException("Registration details are required.");
+        if (!ValidationUtil.isNotEmpty(dto.getUsername()) || !ValidationUtil.isNotEmpty(dto.getAddress())
+                || !ValidationUtil.isNotEmpty(dto.getCity()) || !ValidationUtil.isNotEmpty(dto.getCountry()))
+            throw new ValidationException("Username, address, city and country are required.");
+        dto.setUsername(dto.getUsername().trim());
+        dto.setEmail(dto.getEmail() == null ? null : dto.getEmail().trim().toLowerCase(java.util.Locale.ROOT));
+        dto.setMobileNumber(dto.getMobileNumber() == null ? null : dto.getMobileNumber().trim());
+        if (!dto.getUsername().matches("[A-Za-z0-9_.-]{3,50}")) throw new ValidationException("Username must contain 3 to 50 letters, numbers, dots, dashes or underscores.");
         if (!ValidationUtil.isNotEmpty(dto.getFirstName()) || !ValidationUtil.isNotEmpty(dto.getLastName())) {
             throw new ValidationException("First Name and Last Name are mandatory.");
         }
@@ -58,7 +66,7 @@ public class CustomerServiceImpl implements CustomerService {
             }
 
             Customer customer = new Customer();
-            customer.setCustomerNumber("CUST" + (100000 + (int)(Math.random() * 900000))); // Generate unique CUST number
+            customer.setCustomerNumber("CUST" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16)); // Generate unique CUST number
             customer.setFirstName(dto.getFirstName());
             customer.setLastName(dto.getLastName());
             customer.setDateOfBirth(dto.getDateOfBirth());
@@ -89,6 +97,17 @@ public class CustomerServiceImpl implements CustomerService {
             LOGGER.log(Level.SEVERE, "Database error during registration", e);
             throw new ValidationException("System error during registration. Please try again.");
         }
+    }
+
+    @Override
+    public void updateProfile(Customer customer) throws ValidationException {
+        if (customer == null || !ValidationUtil.isNotEmpty(customer.getFirstName()) || !ValidationUtil.isNotEmpty(customer.getLastName())
+                || !ValidationUtil.isNotEmpty(customer.getAddress()) || !ValidationUtil.isNotEmpty(customer.getCity())
+                || !ValidationUtil.isNotEmpty(customer.getCountry()) || !ValidationUtil.isEligibleAge(customer.getDateOfBirth(),18))
+            throw new ValidationException("Name, address, city, country and an eligible date of birth are required.");
+        try {
+            if (!customerDAO.update(customer)) throw new ValidationException("Customer not found.");
+        } catch (SQLException e) { throw new ValidationException("Could not update customer profile: " + e.getMessage()); }
     }
 
     @Override

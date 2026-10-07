@@ -52,7 +52,7 @@ public class Payment {
 
     @Override
     public String toString() {
-        return String.format("[%s] Ref: %s | Bill ID: %d | Amount: ₹%.2f | Mode: %s | Status: %s",
+        return String.format("[%s] Ref: %s | Bill ID: %d | Amount: Rs %.2f | Mode: %s | Status: %s",
                 paymentDate, transactionReference, billId, amount, paymentMode, paymentStatus);
     }
 }

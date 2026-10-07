@@ -17,6 +17,8 @@ public interface CustomerDAO {
     boolean updatePassword(int customerId, String newPasswordHash) throws SQLException;
     boolean updateAccountStatus(int customerId, String status) throws SQLException;
     void logLoginAttempt(String username, String role, String ip, String status) throws SQLException;
+    int getRecentFailedLoginAttempts(String username, String role, int withinMinutes) throws SQLException;
+    Optional<String> getLastLoginTimestamp(String username, String role) throws SQLException;
     int getRecentFailedLoginAttempts(String username, int withinMinutes) throws SQLException;
     Optional<String> getLastLoginTimestamp(String username) throws SQLException;
 }

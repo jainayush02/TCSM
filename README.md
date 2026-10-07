@@ -1,4 +1,7 @@
 # Telecom Customer & Subscription Management System (TCSMS)
+
+The case-study fixes and current test results are documented in [the verification report](reports/case-study-fix-report.md).
+Customer menus cover add-ons, monthly usage, profile editing, and plan comparison/filtering. The administrator dashboard includes customer, SIM and subscription management, monthly usage, and plan-change policies. Billing and overdue monitoring run automatically and write to rotating files under `logs/`. Plan changes use prorated adjustment invoices; credits apply to the next monthly invoice.
 ### Amdocs Preboarding Project Case Study
 
 A centralized, enterprise-grade Java console application for managing telecom customer onboarding, SIM cards, tariff plans, subscriptions, real-time usage tracking, billing cycles, payment processing, complaints, and executive business reports.
@@ -122,7 +125,7 @@ The script will automatically:
 The console application can be run in multiple terminals against the same localhost database.
 
 1. Open Terminal 1 and run `run.bat`.
-2. Login as administrator and select option `20. Toggle Live Activity Monitor`.
+2. Login as administrator and select option `23. Live Activity Monitor`.
 3. Open Terminal 2 in the same project folder and run `run.bat` again.
 4. Login as a customer and register, subscribe, change plans, record usage, raise a complaint, or make a payment.
 5. The administrator terminal displays new activity events from the shared `audit_logs` table every two seconds.

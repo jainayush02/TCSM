@@ -4,6 +4,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public class Customer {
+    private String previousLogin;
+    public String getPreviousLogin() { return previousLogin; }
+    public void setPreviousLogin(String value) { previousLogin=value; }
     private int customerId;
     private String customerNumber;
     private String firstName;

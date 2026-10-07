@@ -29,45 +29,20 @@ public class BillingScheduler {
     }
 
     public void start(long initialDelay, long period) {
-        Runnable billingTask = () -> {
-            String billingMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
-            LOGGER.info("[BillingScheduler] Starting monthly billing cycle for: " + billingMonth);
-            System.out.println("\n[BillingScheduler] === Monthly Billing Cycle Started for " + billingMonth + " ===");
-
-            try {
-                List<MobileSubscription> activeSubs = subscriptionDAO.findAll();
-                int generated = 0;
-                int skipped = 0;
-
-                for (MobileSubscription sub : activeSubs) {
-                    if (!"ACTIVE".equals(sub.getStatus())) {
-                        skipped++;
-                        continue;
-                    }
-                    try {
-                        billingService.generateMonthlyBill(sub.getSubscriptionId(), billingMonth);
-                        generated++;
-                        System.out.println("  [✓] Bill generated for Subscription: " + sub.getSubscriptionNumber());
-                    } catch (Exception e) {
-                        skipped++;
-                    }
-                }
-                System.out.println("[BillingScheduler] Cycle complete. Generated: " + generated + " | Skipped: " + skipped);
-                LOGGER.info("[BillingScheduler] Cycle complete. Generated=" + generated + ", Skipped=" + skipped);
-
-            } catch (Exception e) {
-                LOGGER.log(Level.SEVERE, "[BillingScheduler] Error during billing cycle", e);
-            }
-        };
+        Runnable billingTask = () -> runBilling(false);
 
         scheduler.scheduleAtFixedRate(billingTask, initialDelay, period, TimeUnit.SECONDS);
         LOGGER.info("[BillingScheduler] Scheduled. Initial delay: " + initialDelay + "s, Period: " + period + "s");
     }
 
     public void triggerNow() {
+        runBilling(true);
+    }
+
+    private void runBilling(boolean interactive) {
         String billingMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
-        LOGGER.info("[BillingScheduler] Manual trigger for: " + billingMonth);
-        System.out.println("\n[BillingScheduler] Manual billing trigger for: " + billingMonth);
+        String runType = interactive ? "Manual" : "Scheduled";
+        report("[BillingScheduler] " + runType + " billing trigger for: " + billingMonth, interactive);
 
         try {
             List<MobileSubscription> activeSubs = subscriptionDAO.findAll();
@@ -76,16 +51,30 @@ public class BillingScheduler {
             for (MobileSubscription sub : activeSubs) {
                 if (!"ACTIVE".equals(sub.getStatus())) continue;
                 try {
+                    com.amdocs.telecom.dao.impl.BillingDAOImpl dao=new com.amdocs.telecom.dao.impl.BillingDAOImpl();
+                    if(dao.findBySubscriptionAndMonth(sub.getSubscriptionId(),billingMonth).isPresent()) {
+                        ((BillingServiceImpl)billingService).reconcileUsage(sub.getSubscriptionId(),billingMonth);
+                        continue;
+                    }
                     billingService.generateMonthlyBill(sub.getSubscriptionId(), billingMonth);
                     generated++;
-                    System.out.println("  [✓] Bill generated for: " + sub.getSubscriptionNumber());
-                } catch (Exception ignored) {
-                }
+                    report("  [OK] Bill generated for: " + sub.getSubscriptionNumber(), interactive);
+                } catch (Exception e) { LOGGER.log(Level.WARNING,"Could not bill subscription " + sub.getSubscriptionId(),e); }
             }
-            System.out.println("[BillingScheduler] Manual run complete. Bills generated: " + generated);
+            for(com.amdocs.telecom.model.Bill bill:new com.amdocs.telecom.dao.impl.BillingDAOImpl().findAll()) {
+                if("MONTHLY".equals(bill.getInvoiceType()) && !"CANCELLED".equals(bill.getBillStatus()))
+                    ((BillingServiceImpl)billingService).reconcileUsage(bill.getSubscriptionId(),bill.getBillingMonth());
+            }
+            report("[BillingScheduler] " + runType + " run complete. Bills generated: " + generated, interactive);
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Error during manual billing", e);
+            LOGGER.log(Level.SEVERE, "Error during " + runType.toLowerCase(java.util.Locale.ROOT) + " billing", e);
+            if (interactive) System.out.println("Billing failed. Check the application log for details.");
         }
+    }
+
+    private void report(String message, boolean interactive) {
+        LOGGER.info(message);
+        if (interactive) System.out.println(message);
     }
 
     public void shutdown() {

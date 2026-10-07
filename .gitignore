@@ -7,5 +7,8 @@ sources.txt
 data/*.mv.db
 data/*.lock.db
 output/
+logs/
+__pycache__/
+*.pyc
 reports/*.pdf
 reports/Invoice_Test.html

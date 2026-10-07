@@ -38,7 +38,15 @@ public class SubscriptionServiceImpl implements SubscriptionService {
 
     @Override
     public MobileSubscription subscribeToPlan(int customerId, int planId, String simTypeStr) throws TelecomException {
+        return com.amdocs.telecom.util.Transactions.run(() -> subscribeToPlanInternal(customerId, planId, simTypeStr));
+    }
+
+    private MobileSubscription subscribeToPlanInternal(int customerId, int planId, String simTypeStr) throws TelecomException {
         try {
+            lockCustomer(customerId);
+            if (simTypeStr == null) throw new TelecomException("SIM type is required.");
+            try { simTypeStr = com.amdocs.telecom.model.SimType.valueOf(simTypeStr.trim().toUpperCase()).name(); }
+            catch (IllegalArgumentException e) { throw new TelecomException("Invalid SIM type."); }
             Optional<TelecomPlan> planOpt = planDAO.findById(planId);
             if (!planOpt.isPresent()) {
                 throw new TelecomException("Invalid Plan ID.");
@@ -62,7 +70,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
             SIMCard sim = simOpt.get();
 
             String newMobileNumber = "+91-987" + (1000000 + (int)(Math.random() * 9000000));
-            String subNumber = "SUB" + (10000 + (int)(Math.random() * 90000));
+            String subNumber = "SUB" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0,16);
 
             MobileSubscription sub = new MobileSubscription();
             sub.setSubscriptionNumber(subNumber);
@@ -87,7 +95,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
             audit.setEntityName("SUBSCRIPTION");
             audit.setEntityId(String.valueOf(created.getSubscriptionId()));
             audit.setAction("CREATED");
-            audit.setDetails("Subscription " + created.getSubscriptionNumber() + " created for customer " + customerId);
+            audit.setDetails(String.format("Subscription %s created for customer %d", created.getSubscriptionNumber(), customerId));
             audit.setPerformedBy(String.valueOf(customerId));
             try {
                 auditDAO.logAudit(audit);
@@ -103,7 +111,12 @@ public class SubscriptionServiceImpl implements SubscriptionService {
 
     @Override
     public boolean changePlan(int subscriptionId, int newPlanId, int customerId, String changedBy) throws TelecomException {
+        return com.amdocs.telecom.util.Transactions.run(() -> changePlanInternal(subscriptionId, newPlanId, customerId, changedBy));
+    }
+
+    private boolean changePlanInternal(int subscriptionId, int newPlanId, int customerId, String changedBy) throws TelecomException {
         try {
+            lockCustomer(customerId);
             Optional<MobileSubscription> subOpt = subscriptionDAO.findById(subscriptionId);
             if (!subOpt.isPresent()) {
                 throw new TelecomException("Subscription not found.");
@@ -114,6 +127,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 throw new TelecomException("You are not authorized to change this subscription.");
             }
 
+            if (!"ACTIVE".equals(sub.getStatus())) throw new TelecomException("Only active subscriptions can change plans.");
             if (sub.getPlanId() == newPlanId) {
                 throw new TelecomException("You are already subscribed to this plan.");
             }
@@ -124,17 +138,25 @@ public class SubscriptionServiceImpl implements SubscriptionService {
             }
 
             TelecomPlan newPlan = newPlanOpt.get();
-            if (sub.getSubscriptionType() != newPlan.getPlanType()) {
+            TelecomPlan oldPlan = planDAO.findById(sub.getPlanId()).orElseThrow();
+            if (sub.getSubscriptionType() != newPlan.getPlanType() && !(oldPlan.isAllowTypeChange() && newPlan.isAllowTypeChange())) {
                 throw new TelecomException("Prepaid and postpaid plan types cannot be switched during a plan change.");
             }
 
+            if (subscriptionDAO.findByCustomerId(customerId).stream().anyMatch(s -> s.getSubscriptionId()!=subscriptionId && s.getPlanId()==newPlanId && "ACTIVE".equals(s.getStatus())))
+                throw new TelecomException("You already have an active subscription to this plan.");
+            java.time.LocalDate lastChange = subscriptionDAO.getHistory(subscriptionId).stream().findFirst()
+                    .map(h -> h.getChangeDate().toLocalDate()).orElse(sub.getActivationDate());
+            if (java.time.temporal.ChronoUnit.DAYS.between(lastChange,java.time.LocalDate.now()) < oldPlan.getMinimumChangeDays())
+                throw new TelecomException("This plan's minimum change period has not elapsed.");
             boolean changed = subscriptionDAO.changePlan(subscriptionId, newPlanId, "Customer Request", changedBy);
             if (changed) {
+                billingService.generatePlanChangeBill(subscriptionId,newPlanId);
                 AuditLog audit = new AuditLog();
                 audit.setEntityName("SUBSCRIPTION");
                 audit.setEntityId(String.valueOf(subscriptionId));
                 audit.setAction("PLAN_CHANGED");
-                audit.setDetails("Plan changed to " + newPlan.getPlanCode());
+                audit.setDetails(String.format("Plan changed to %s", newPlan.getPlanCode()));
                 audit.setPerformedBy(changedBy);
                 try {
                     auditDAO.logAudit(audit);
@@ -149,12 +171,21 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         }
     }
 
+    private void lockCustomer(int id) throws SQLException, TelecomException {
+        try (java.sql.Connection c=com.amdocs.telecom.util.DBConnection.getInstance().getConnection();
+             java.sql.PreparedStatement p=c.prepareStatement("SELECT account_status FROM customers WHERE customer_id=? FOR UPDATE")) {
+            p.setInt(1,id); try(java.sql.ResultSet r=p.executeQuery()) {
+                if (!r.next() || !"ACTIVE".equals(r.getString(1))) throw new TelecomException("An active customer account is required.");
+            }
+        }
+    }
+
     @Override
     public List<MobileSubscription> getCustomerSubscriptions(int customerId) {
         try {
             return subscriptionDAO.findByCustomerId(customerId);
         } catch (SQLException e) {
-            return List.of();
+            throw new IllegalStateException("Database operation failed.", e);
         }
     }
 

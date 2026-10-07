@@ -29,12 +29,13 @@ public class PlanServiceImpl implements PlanService {
         try {
             return planDAO.findAllActive();
         } catch (SQLException e) {
-            return List.of();
+            throw new IllegalStateException("Database operation failed.", e);
         }
     }
 
     @Override
     public List<TelecomPlan> searchPlansByName(String keyword) {
+        if(keyword==null) throw new IllegalArgumentException("Search text is required.");
         List<TelecomPlan> plans = getAllActivePlans();
         Predicate<TelecomPlan> nameContains = p -> p.getPlanName().toLowerCase().contains(keyword.toLowerCase());
         return plans.stream()
@@ -44,6 +45,7 @@ public class PlanServiceImpl implements PlanService {
 
     @Override
     public List<TelecomPlan> filterPlansByMaxPrice(double maxPrice) {
+        if(!Double.isFinite(maxPrice) || maxPrice<0) throw new IllegalArgumentException("Maximum price must be finite and nonnegative.");
         List<TelecomPlan> plans = getAllActivePlans();
         Predicate<TelecomPlan> withinBudget = p -> p.getMonthlyRental() <= maxPrice;
         return plans.stream()
@@ -53,6 +55,7 @@ public class PlanServiceImpl implements PlanService {
 
     @Override
     public List<TelecomPlan> filterPlansByMinData(int minDataGB) {
+        if(minDataGB<0) throw new IllegalArgumentException("Minimum data must be nonnegative.");
         List<TelecomPlan> plans = getAllActivePlans();
         Predicate<TelecomPlan> enoughData = p -> p.getDataAllowanceGB() >= minDataGB;
         return plans.stream()
@@ -76,6 +79,7 @@ public class PlanServiceImpl implements PlanService {
 
     @Override
     public List<TelecomPlan> filterPlansByPriceRange(double minPrice, double maxPrice) {
+        if(!Double.isFinite(minPrice) || !Double.isFinite(maxPrice) || minPrice<0 || maxPrice<minPrice) throw new IllegalArgumentException("Invalid price range.");
         List<TelecomPlan> plans = getAllActivePlans();
         Predicate<TelecomPlan> atLeastMin = p -> p.getMonthlyRental() >= minPrice;
         Predicate<TelecomPlan> atMostMax = p -> p.getMonthlyRental() <= maxPrice;

@@ -6,6 +6,8 @@ import com.amdocs.telecom.service.impl.*;
 public class ServiceFactory {
 
     private ServiceFactory() {}
+    public static AddOnService getAddOnService() { return new AddOnServiceImpl(); }
+    public static AdministrationService getAdministrationService() { return new AdministrationServiceImpl(); }
 
     public static AuthenticationService getAuthenticationService() {
         return new AuthenticationServiceImpl();

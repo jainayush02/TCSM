@@ -11,9 +11,19 @@ import java.util.List;
 import java.util.Optional;
 
 public class PlanDAOImpl implements PlanDAO {
+    private void validate(TelecomPlan plan) {
+        if(plan==null || plan.getPlanType()==null || plan.getPlanCode()==null || plan.getPlanCode().isBlank()
+                || plan.getPlanName()==null || plan.getPlanName().isBlank() || !Double.isFinite(plan.getMonthlyRental())
+                || plan.getMonthlyRental()<0 || plan.getDataAllowanceGB()<0 || plan.getVoiceMinutes() < -1
+                || plan.getSmsAllowance()<0 || plan.getValidityDays()<=0)
+            throw new IllegalArgumentException("Plan details and nonnegative allowances are required, with positive validity.");
+        if(plan.getStatus()!=null && !java.util.Set.of("ACTIVE","INACTIVE").contains(plan.getStatus()))
+            throw new IllegalArgumentException("Invalid plan status.");
+    }
 
     @Override
     public TelecomPlan save(TelecomPlan plan) throws SQLException {
+        validate(plan);
         String sql = "INSERT INTO telecom_plans (plan_code, plan_name, plan_type, monthly_rental, " +
                 "data_allowance_gb, voice_minutes, sms_allowance, validity_days, international_roaming, status) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
@@ -101,6 +111,7 @@ public class PlanDAOImpl implements PlanDAO {
 
     @Override
     public boolean update(TelecomPlan plan) throws SQLException {
+        validate(plan);
         String sql = "UPDATE telecom_plans SET plan_name = ?, plan_type = ?, monthly_rental = ?, " +
                 "data_allowance_gb = ?, voice_minutes = ?, sms_allowance = ?, validity_days = ?, " +
                 "international_roaming = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE plan_id = ?";
@@ -122,6 +133,7 @@ public class PlanDAOImpl implements PlanDAO {
 
     @Override
     public boolean updateStatus(int planId, String status) throws SQLException {
+        if(status==null || !java.util.Set.of("ACTIVE","INACTIVE").contains(status)) throw new IllegalArgumentException("Invalid plan status.");
         String sql = "UPDATE telecom_plans SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE plan_id = ?";
         try (Connection conn = DBConnection.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -153,6 +165,8 @@ public class PlanDAOImpl implements PlanDAO {
         plan.setSmsAllowance(rs.getInt("sms_allowance"));
         plan.setValidityDays(rs.getInt("validity_days"));
         plan.setInternationalRoaming(rs.getBoolean("international_roaming"));
+        plan.setAllowTypeChange(rs.getBoolean("allow_type_change"));
+        plan.setMinimumChangeDays(rs.getInt("minimum_change_days"));
         plan.setStatus(rs.getString("status"));
 
         Timestamp created = rs.getTimestamp("created_at");

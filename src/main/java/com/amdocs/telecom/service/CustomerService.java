@@ -12,4 +12,5 @@ public interface CustomerService {
     List<Customer> getAllCustomers();
     boolean isUsernameRegistered(String username);
     boolean isUserRegistered(String usernameOrEmail);
+    void updateProfile(Customer customer) throws ValidationException;
 }

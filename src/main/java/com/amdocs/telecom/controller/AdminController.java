@@ -1,5 +1,7 @@
 package com.amdocs.telecom.controller;
 
+import com.amdocs.telecom.util.ConsoleMenu;
+
 import com.amdocs.telecom.dao.AdminDAO;
 import com.amdocs.telecom.dao.AuditAndNotificationDAO;
 import com.amdocs.telecom.dao.impl.AdminDAOImpl;
@@ -53,13 +55,8 @@ public class AdminController {
     public void showLoginMenu() {
         boolean inPortal = true;
         while (inPortal) {
-            System.out.println("\n╔══════════════════════════════════════╗");
-            System.out.println("║     ADMINISTRATOR LOGIN PORTAL       ║");
-            System.out.println("╠══════════════════════════════════════╣");
-            System.out.println("║  1. Admin Login                      ║");
-            System.out.println("║  2. Forgot Password (OTP Recovery)   ║");
-            System.out.println("║  3. Back to Main Menu                ║");
-            System.out.println("╚══════════════════════════════════════╝");
+            ConsoleMenu.show("ADMINISTRATOR LOGIN PORTAL", null,
+                    "1. Admin Login", "2. Forgot Password", "3. Back to Main Menu");
             System.out.print("Select option: ");
             if (!scanner.hasNextLine()) break;
 
@@ -86,11 +83,11 @@ public class AdminController {
         // Check the account before requesting a password.
         try {
             if (!adminDAO.findByUsername(username).isPresent()) {
-                System.out.println("❌ Admin username '" + username + "' is not registered. Please check your username.");
+                System.out.println("[Error] Admin username '" + username + "' is not registered. Please check your username.");
                 return false;
             }
         } catch (SQLException e) {
-            System.out.println("❌ Database error while verifying username: " + e.getMessage());
+            System.out.println("[Error] Database error while verifying username: " + e.getMessage());
             return false;
         }
 
@@ -111,45 +108,49 @@ public class AdminController {
             }
 
             if (cAttempt < 3) {
-                System.out.println("⚠️ CAPTCHA did not match. Generating new CAPTCHA (Attempt " + (cAttempt + 1) + " of 3):");
+                System.out.println("[Warning] CAPTCHA did not match. Generating new CAPTCHA (Attempt " + (cAttempt + 1) + " of 3):");
             } else {
-                System.out.println("❌ CAPTCHA verification failed. Returning to menu.");
+                System.out.println("[Error] CAPTCHA verification failed. Returning to menu.");
                 return false;
             }
         }
 
         try {
             Optional<Administrator> opt = adminDAO.findByUsername(username);
+            if(opt.isPresent() && "LOCKED".equals(opt.get().getAccountStatus()) && com.amdocs.telecom.security.LoginSecurity.unlockIfExpired(username,"ADMIN"))
+                opt=adminDAO.findByUsername(username);
             if (opt.isPresent() && "LOCKED".equals(opt.get().getAccountStatus())) {
-                System.out.println("❌ Admin account is locked. Use password recovery to unlock it.");
+                System.out.println("[Error] Admin account is locked. Use password recovery to unlock it.");
                 return false;
             }
+            if(opt.isPresent() && !"ACTIVE".equals(opt.get().getAccountStatus())) { System.out.println("Administrator account is inactive."); return false; }
             if (opt.isPresent() && PasswordUtil.verifyPassword(password, opt.get().getPasswordHash())) {
                 loggedInAdmin = opt.get();
                 adminDAO.updateAccountStatus(loggedInAdmin.getAdminId(), "ACTIVE");
                 
                 // Show the previous login before recording this one.
-                Optional<String> lastLogin = new CustomerDAOImpl().getLastLoginTimestamp(username);
-                System.out.println("\n✅ Admin login successful! Welcome, " + loggedInAdmin.getFullName());
-                lastLogin.ifPresent(ts -> System.out.println("  🕒 Last Login Timestamp: " + ts));
+                Optional<String> lastLogin = new CustomerDAOImpl().getLastLoginTimestamp(username,"ADMIN");
+                System.out.println("\n[OK] Admin login successful! Welcome, " + loggedInAdmin.getFullName());
+                lastLogin.ifPresent(ts -> System.out.println("   Last Login Timestamp: " + ts));
 
                 new CustomerDAOImpl().logLoginAttempt(username, "ADMIN", "127.0.0.1", "SUCCESS");
                 return true;
             } else {
                 new CustomerDAOImpl().logLoginAttempt(username, "ADMIN", "127.0.0.1", "FAILED");
                 if (opt.isPresent()) {
-                    int failures = new CustomerDAOImpl().getRecentFailedLoginAttempts(username, 30);
+                    int failures = new CustomerDAOImpl().getRecentFailedLoginAttempts(username,"ADMIN",30);
                     if (failures >= 3) {
                         adminDAO.updateAccountStatus(opt.get().getAdminId(), "LOCKED");
-                        System.out.println("❌ Maximum 3 failed attempts reached. Admin account locked.");
+                        com.amdocs.telecom.security.LoginSecurity.lock(username,"ADMIN");
+                        System.out.println("[Error] Maximum 3 failed attempts reached. Admin account locked.");
                         return false;
                     }
                 }
-                System.out.println("❌ Invalid admin credentials.");
+                System.out.println("[Error] Invalid admin credentials.");
                 return false;
             }
         } catch (SQLException e) {
-            System.out.println("❌ Database error: " + e.getMessage());
+            System.out.println("[Error] Database error: " + e.getMessage());
             return false;
         }
     }
@@ -157,78 +158,124 @@ public class AdminController {
     private void showAdminDashboard() {
         boolean running = true;
         while (running) {
-            System.out.println("\n╔══════════════════════════════════════╗");
-            System.out.println("║      ADMINISTRATOR DASHBOARD         ║");
-            System.out.println("║  Admin: " + padRight(loggedInAdmin.getFullName(), 27) + " ║");
-            System.out.println("╠══════════════════════════════════════╣");
-            System.out.println("║  1.  View All Plans                  ║");
-            System.out.println("║  2.  Add New Plan                    ║");
-            System.out.println("║  3.  Activate/Deactivate Plan        ║");
-            System.out.println("║  4.  View All Customers              ║");
-            System.out.println("║  5.  View All Subscriptions          ║");
-            System.out.println("║  6.  Generate Billing Cycle          ║");
-            System.out.println("║  7.  View Unpaid Bills               ║");
-            System.out.println("║  8.  Scan Overdue Accounts           ║");
-            System.out.println("║  9.  Process Bulk Usage              ║");
-            System.out.println("║  10. Revenue Reports                 ║");
-            System.out.println("║  11. Customer Distribution by City   ║");
-            System.out.println("║  12. Customer Complaints & Resolve   ║");
-            System.out.println("║  13. Complaint Hotspots & Analytics  ║");
-            System.out.println("║  14. View Audit Logs                 ║");
-            System.out.println("║  15. Change My Password              ║");
-            System.out.println("║  16. Logout                          ║");
-            System.out.println("║  17. View Payments                   ║");
-            System.out.println("║  18. Reactivate Subscription         ║");
-            System.out.println("║  19. View SIM Inventory              ║");
-            System.out.println("║  20. Toggle Live Activity Monitor    ║");
-            System.out.println("╚══════════════════════════════════════╝");
+            ConsoleMenu.showCompact("ADMINISTRATOR DASHBOARD", "Admin: " + loggedInAdmin.getFullName(),
+                    "PLANS", "1. View Active Plans", "2. Add Plan", "3. Set Plan Status", "4. Configure Plan Rules",
+                    "", "CUSTOMERS AND SUBSCRIPTIONS", "5. View Customers", "6. Edit Customer / Set Status",
+                    "7. View Subscriptions", "8. Set Subscription Status", "9. View SIM Inventory", "10. Add SIM / Set Status",
+                    "", "BILLING AND USAGE", "11. Generate Monthly Bills", "12. View Unpaid Bills", "13. View Payments",
+                    "14. Scan Overdue Accounts", "15. Process Bulk Usage", "16. View Monthly Usage",
+                    "", "REPORTS AND SUPPORT", "17. Revenue Reports", "18. Customers by City",
+                    "19. Manage Complaints", "20. Complaint Analytics", "21. Audit Logs",
+                    "", "ACCOUNT", "22. Change My Password", "23. Live Activity Monitor", "0. Logout");
             System.out.print("Select option: ");
             if (!scanner.hasNextLine()) break;
 
             int choice = readInt();
-            switch (choice) {
-                case 1  -> viewAllPlans();
-                case 2  -> addNewPlan();
-                case 3  -> togglePlanStatus();
-                case 4  -> viewAllCustomers();
-                case 5  -> viewAllSubscriptions();
-                case 6  -> generateBillingCycle();
-                case 7  -> viewUnpaidBills();
-                case 8  -> scanOverdueAccounts();
-                case 9  -> processBulkUsage();
-                case 10 -> showRevenueReports();
-                case 11 -> showCustomerDistribution();
-                case 12 -> manageComplaints();
-                case 13 -> showComplaintHotspotsAndAnalytics();
-                case 14 -> viewAuditLogs();
-                case 15 -> handleAdminChangePassword();
-                case 16 -> {
+            try { switch (choice) {
+                case 1 -> viewAllPlans();
+                case 2 -> addNewPlan();
+                case 3 -> togglePlanStatus();
+                case 4 -> configurePlanRules();
+                case 5 -> viewAllCustomers();
+                case 6 -> manageCustomer();
+                case 7 -> viewAllSubscriptions();
+                case 8 -> manageSubscription();
+                case 9 -> viewSimInventory();
+                case 10 -> manageSIM();
+                case 11 -> generateBillingCycle();
+                case 12 -> viewUnpaidBills();
+                case 13 -> viewAllPayments();
+                case 14 -> scanOverdueAccounts();
+                case 15 -> processBulkUsage();
+                case 16 -> viewMonthlyUsage();
+                case 17 -> showRevenueReports();
+                case 18 -> showCustomerDistribution();
+                case 19 -> manageComplaints();
+                case 20 -> showComplaintHotspotsAndAnalytics();
+                case 21 -> viewAuditLogs();
+                case 22 -> handleAdminChangePassword();
+                case 23 -> toggleLiveActivityMonitor();
+                case 0 -> {
+                    try { new CustomerDAOImpl().logLoginAttempt(loggedInAdmin.getUsername(),"ADMIN","127.0.0.1","LOGOUT"); } catch(SQLException e) { System.out.println("Could not record logout."); }
                     System.out.println("Admin logged out.");
                     activityMonitor.stop();
                     loggedInAdmin = null;
                     running = false;
                 }
-                case 17 -> viewAllPayments();
-                case 18 -> reactivateSubscription();
-                case 19 -> viewSimInventory();
-                case 20 -> toggleLiveActivityMonitor();
                 default -> System.out.println("Invalid option.");
-            }
+            } } catch(RuntimeException e) { System.out.println("Could not complete this action: " + e.getMessage()); }
         }
+    }
+
+
+    private final AdministrationService management=new AdministrationServiceImpl();
+    private String value(String label,String current) {
+        System.out.print(label+" ["+current+"]: "); String value=scanner.nextLine().trim(); return value.isEmpty()?current:value;
+    }
+    private void manageCustomer() {
+        try {
+            System.out.print("Customer ID (0 to return): "); int id=readInt(); if(id<=0) return;
+            Customer c=customerService.getCustomerById(id);
+            ConsoleMenu.show("MANAGE CUSTOMER", null, "1. Edit Profile", "2. Set Status", "0. Back");
+            System.out.print("Customer action: "); int option=readInt();
+            if(option==1) {
+                c.setFirstName(value("First name",c.getFirstName())); c.setLastName(value("Last name",c.getLastName()));
+                c.setAddress(value("Address",c.getAddress())); c.setCity(value("City",c.getCity())); c.setCountry(value("Country",c.getCountry()));
+                management.updateCustomer(loggedInAdmin,c);
+            } else if(option==2) {
+                System.out.print("Status (ACTIVE/SUSPENDED/INACTIVE): "); management.setCustomerStatus(loggedInAdmin,id,scanner.nextLine().trim().toUpperCase());
+            } else return;
+            System.out.println("Customer updated.");
+        } catch(Exception e) { System.out.println(e.getMessage()); }
+    }
+    private void manageSIM() {
+        try {
+            ConsoleMenu.show("MANAGE SIM", null, "1. Add SIM", "2. Set Status", "0. Back");
+            System.out.print("SIM action: "); int option=readInt();
+            if(option==1) {
+                SIMCard sim=new SIMCard();
+                System.out.print("SIM number: "); sim.setSimNumber(scanner.nextLine().trim());
+                System.out.print("IMSI: "); sim.setImsi(scanner.nextLine().trim());
+                System.out.print("SIM type (ESIM/PHYSICAL_SIM): "); sim.setSimType(SimType.valueOf(scanner.nextLine().trim().toUpperCase()));
+                management.addSIM(loggedInAdmin,sim); System.out.println("SIM added.");
+            } else if(option==2) {
+                System.out.print("SIM ID: "); int id=readInt(); System.out.print("Status (ACTIVE/INACTIVE): ");
+                management.setSIMStatus(loggedInAdmin,id,scanner.nextLine().trim().toUpperCase()); System.out.println("SIM updated.");
+            }
+        } catch(Exception e) { System.out.println(e.getMessage()); }
+    }
+    private void manageSubscription() {
+        try {
+            System.out.print("Subscription ID (0 to return): "); int id=readInt(); if(id<=0) return;
+            System.out.print("Status (ACTIVE/SUSPENDED/INACTIVE): "); management.setSubscriptionStatus(loggedInAdmin,id,scanner.nextLine().trim().toUpperCase());
+            System.out.println("Subscription updated.");
+        } catch(Exception e) { System.out.println(e.getMessage()); }
+    }
+    private void viewMonthlyUsage() {
+        try {
+            System.out.print("Subscription ID: "); int id=readInt(); System.out.print("Month (yyyy-MM): ");
+            management.getUsage(loggedInAdmin,id,scanner.nextLine().trim()).forEach(System.out::println);
+        } catch(Exception e) { System.out.println(e.getMessage()); }
+    }
+    private void configurePlanRules() {
+        try {
+            System.out.print("Plan ID: "); int id=readInt(); System.out.print("Allow prepaid/postpaid changes? (Y/N): "); boolean allow=scanner.nextLine().trim().equalsIgnoreCase("Y");
+            System.out.print("Minimum days before another change: "); management.setPlanRules(loggedInAdmin,id,allow,readInt()); System.out.println("Plan rules updated.");
+        } catch(Exception e) { System.out.println(e.getMessage()); }
     }
 
     private void viewAllPlans() {
         List<TelecomPlan> plans = planService.getAllActivePlans();
-        System.out.println("\n┌─── ALL ACTIVE TELECOM PLANS ────────┐");
-        System.out.printf("  %-4s %-10s %-16s %-8s %6s %10s ₹%-8s %s%n",
+        System.out.println("\nALL ACTIVE TELECOM PLANS");
+        System.out.printf("  %-4s %-10s %-16s %-8s %6s %10s Rs %-8s %s%n",
                 "ID", "Code", "Name", "Type", "Data", "Voice", "Price", "Status");
         System.out.println("  " + "-".repeat(85));
         for (TelecomPlan p : plans) {
-            System.out.printf("  %-4d %-10s %-16s %-8s %4dGB %10s ₹%-8.2f %s%n",
+            System.out.printf("  %-4d %-10s %-16s %-8s %4dGB %10s Rs %-8.2f %s%n",
                     p.getPlanId(), p.getPlanCode(), p.getPlanName(), p.getPlanType(),
                     p.getDataAllowanceGB(), p.getVoiceDisplay(), p.getMonthlyRental(), p.getStatus());
         }
-        System.out.println("└──────────────────────────────────────┘");
+        System.out.println("------------------------------------------------------------");
     }
 
     private void addNewPlan() {
@@ -239,7 +286,7 @@ public class AdminController {
         String name = scanner.nextLine().trim();
         System.out.print("Plan Type (PREPAID / POSTPAID): ");
         String type = scanner.nextLine().trim().toUpperCase();
-        System.out.print("Monthly Rental (₹): ");
+        System.out.print("Monthly Rental (Rs ): ");
         double rental = readDouble();
         System.out.print("Data Allowance (GB): ");
         int data = readInt();
@@ -266,9 +313,9 @@ public class AdminController {
             plan.setStatus("ACTIVE");
 
             new com.amdocs.telecom.dao.impl.PlanDAOImpl().save(plan);
-            System.out.println("✅ Plan created: " + plan.getPlanCode() + " (ID: " + plan.getPlanId() + ")");
+            System.out.println("[OK] Plan created: " + plan.getPlanCode() + " (ID: " + plan.getPlanId() + ")");
         } catch (Exception e) {
-            System.out.println("❌ Error: " + e.getMessage());
+            System.out.println("[Error] Error: " + e.getMessage());
         }
     }
 
@@ -279,16 +326,20 @@ public class AdminController {
         System.out.print("New Status (ACTIVE / INACTIVE): ");
         String status = scanner.nextLine().trim().toUpperCase();
         try {
-            new com.amdocs.telecom.dao.impl.PlanDAOImpl().updateStatus(planId, status);
-            System.out.println("✅ Plan status updated to: " + status);
+            boolean updated = new com.amdocs.telecom.dao.impl.PlanDAOImpl().updateStatus(planId, status);
+            if (updated) {
+                System.out.println("[OK] Plan status updated to: " + status);
+            } else {
+                System.out.println("[Error] Plan not found.");
+            }
         } catch (Exception e) {
-            System.out.println("❌ Error: " + e.getMessage());
+            System.out.println("[Error] Error: " + e.getMessage());
         }
     }
 
     private void viewAllCustomers() {
         List<Customer> customers = customerService.getAllCustomers();
-        System.out.println("\n┌─── ALL CUSTOMERS ───────────────────┐");
+        System.out.println("\nALL CUSTOMERS");
         System.out.printf("  %-12s %-20s %-25s %-15s %s%n", "Cust No", "Name", "Email", "City", "Status");
         System.out.println("  " + "-".repeat(85));
         for (Customer c : customers) {
@@ -296,71 +347,55 @@ public class AdminController {
                     c.getCustomerNumber(), c.getFullName(), c.getEmail(), c.getCity(), c.getAccountStatus());
         }
         System.out.println("  Total customers: " + customers.size());
-        System.out.println("└──────────────────────────────────────┘");
+        System.out.println("------------------------------------------------------------");
     }
 
     private void viewAllSubscriptions() {
         try {
             List<MobileSubscription> subs = new com.amdocs.telecom.dao.impl.SubscriptionDAOImpl().findAll();
-            System.out.println("\n┌─── ALL SUBSCRIPTIONS ───────────────┐");
+            System.out.println("\nALL SUBSCRIPTIONS");
             for (MobileSubscription s : subs) {
                 System.out.println("  " + s);
             }
             System.out.println("  Total: " + subs.size());
-            System.out.println("└──────────────────────────────────────┘");
+            System.out.println("------------------------------------------------------------");
         } catch (SQLException e) {
-            System.out.println("❌ Error: " + e.getMessage());
+            System.out.println("[Error] Error: " + e.getMessage());
         }
     }
 
     private void viewAllPayments() {
         try {
             List<Payment> payments = new com.amdocs.telecom.dao.impl.PaymentDAOImpl().findAll();
-            System.out.println("\n┌─── ALL PAYMENTS ────────────────────┐");
+            System.out.println("\nALL PAYMENTS");
             if (payments.isEmpty()) {
                 System.out.println("  No payments found.");
             } else {
                 for (Payment payment : payments) {
-                    System.out.printf("  #%d | %s | Bill: %d | Customer: %d | ₹%.2f | %s | %s%n",
+                    System.out.printf("  #%d | %s | Bill: %d | Customer: %d | Rs %.2f | %s | %s%n",
                             payment.getPaymentId(), payment.getTransactionReference(), payment.getBillId(),
                             payment.getCustomerId(), payment.getAmount(), payment.getPaymentMode(),
                             payment.getPaymentStatus());
                 }
             }
-            System.out.println("└──────────────────────────────────────┘");
+            System.out.println("------------------------------------------------------------");
         } catch (SQLException e) {
-            System.out.println("❌ Error: " + e.getMessage());
-        }
-    }
-
-    private void reactivateSubscription() {
-        System.out.print("Enter Subscription ID to reactivate (or 0 to cancel): ");
-        int subscriptionId = readInt();
-        if (subscriptionId <= 0) return;
-
-        try {
-            boolean updated = new com.amdocs.telecom.dao.impl.SubscriptionDAOImpl()
-                    .updateStatus(subscriptionId, "ACTIVE");
-            System.out.println(updated
-                    ? "✅ Subscription reactivated."
-                    : "❌ Subscription was not found.");
-        } catch (SQLException e) {
-            System.out.println("❌ Error: " + e.getMessage());
+            System.out.println("[Error] Error: " + e.getMessage());
         }
     }
 
     private void viewSimInventory() {
         try {
             List<SIMCard> sims = new com.amdocs.telecom.dao.impl.SubscriptionDAOImpl().findAllSIMs();
-            System.out.println("\n┌─── SIM INVENTORY ───────────────────┐");
+            System.out.println("\nSIM INVENTORY");
             for (SIMCard sim : sims) {
                 System.out.printf("  #%d | %s | Type: %s | IMSI: %s | Status: %s%n",
                         sim.getSimId(), sim.getSimNumber(), sim.getSimType(), sim.getImsi(), sim.getStatus());
             }
             System.out.println("  Total SIMs: " + sims.size());
-            System.out.println("└──────────────────────────────────────┘");
+            System.out.println("------------------------------------------------------------");
         } catch (SQLException e) {
-            System.out.println("❌ Error: " + e.getMessage());
+            System.out.println("[Error] Error: " + e.getMessage());
         }
     }
 
@@ -377,7 +412,7 @@ public class AdminController {
 
     private void viewUnpaidBills() {
         List<Bill> unpaid = billingService.getUnpaidBills();
-        System.out.println("\n┌─── UNPAID / OVERDUE BILLS ──────────┐");
+        System.out.println("\nUNPAID / OVERDUE BILLS");
         if (unpaid.isEmpty()) {
             System.out.println("  All bills are paid!");
         } else {
@@ -385,7 +420,7 @@ public class AdminController {
                 System.out.println("  " + b);
             }
         }
-        System.out.println("└──────────────────────────────────────┘");
+        System.out.println("------------------------------------------------------------");
     }
 
     private void scanOverdueAccounts() {
@@ -409,19 +444,17 @@ public class AdminController {
         UsageProcessor processor = new UsageProcessor();
         processor.processBulkUsage(records, Math.max(count / 4, 10));
 
-        // Give background workers time to finish.
-        try { Thread.sleep(3000); } catch (InterruptedException ignored) {}
         processor.shutdown();
     }
 
     private void showRevenueReports() {
-        System.out.println("\n┌─── REVENUE REPORTS & ANALYTICS ─────┐");
+        System.out.println("\nREVENUE REPORTS & ANALYTICS");
 
         Map<String, DoubleSummaryStatistics> revenue = reportService.getRevenueSummaryByPlan();
         if (revenue.isEmpty()) {
             System.out.println("  No revenue data available yet.");
         } else {
-            System.out.printf("  %-12s %8s %12s %12s %12s%n", "Month", "Count", "Sum(₹)", "Avg(₹)", "Max(₹)");
+            System.out.printf("  %-12s %8s %12s %12s %12s%n", "Month", "Count", "Sum(Rs )", "Avg(Rs )", "Max(Rs )");
             System.out.println("  " + "-".repeat(60));
             revenue.forEach((month, stats) ->
                     System.out.printf("  %-12s %8d %12.2f %12.2f %12.2f%n",
@@ -429,16 +462,16 @@ public class AdminController {
         }
 
         double avgPerCustomer = reportService.getAverageMonthlyRevenuePerCustomer();
-        System.out.printf("%n  Average Monthly Revenue per Customer: ₹%.2f%n", avgPerCustomer);
+        System.out.printf("%n  Average Monthly Revenue per Customer: Rs %.2f%n", avgPerCustomer);
 
         // Summarize the most subscribed plans with streams.
         List<Map<String, Object>> topPlans = reportService.getMostSubscribedPlans();
         if (!topPlans.isEmpty()) {
-            System.out.println("\n  📈 MOST SUBSCRIBED PLANS (Java 8 Stream Grouping & Sorting):");
-            System.out.printf("  %-10s %-20s %-12s %s%n", "Code", "Name", "Monthly(₹)", "Subscribers");
+            System.out.println("\n   MOST SUBSCRIBED PLANS:");
+            System.out.printf("  %-10s %-20s %-12s %s%n", "Code", "Name", "Monthly(Rs )", "Subscribers");
             System.out.println("  " + "-".repeat(55));
             for (Map<String, Object> p : topPlans) {
-                System.out.printf("  %-10s %-20s ₹%-11.2f %d%n",
+                System.out.printf("  %-10s %-20s Rs %-11.2f %d%n",
                         p.get("planCode"),
                         String.valueOf(p.get("planName")),
                         (Double) p.get("monthlyRental"),
@@ -449,64 +482,69 @@ public class AdminController {
         // Summarize usage by type with streams.
         Map<String, Double> usageByType = reportService.getOverallUsageByType();
         if (!usageByType.isEmpty()) {
-            System.out.println("\n  📊 TOTAL TELECOM USAGE BY TYPE (Java 8 Stream):");
-            usageByType.forEach((type, qty) -> System.out.printf("    • %-10s : %.2f units%n", type, qty));
+            System.out.println("\n   TOTAL TELECOM USAGE BY TYPE:");
+            usageByType.forEach((type, qty) -> System.out.printf("    %-10s : %.2f %s%n", type, qty,
+                    com.amdocs.telecom.util.UsageUnits.unit(UsageType.valueOf(type))));
         }
 
-        System.out.println("└──────────────────────────────────────┘");
+        System.out.println("\n  HIGHEST DATA USAGE CUSTOMERS:");
+        List<Customer> highestUsage = reportService.getHighestConsumingCustomers(UsageType.DATA);
+        if (highestUsage.isEmpty()) System.out.println("  No data usage recorded.");
+        highestUsage.forEach(c -> System.out.printf("  %s | %s%n", c.getCustomerNumber(), c.getFullName()));
+
+        System.out.println("\n  CUSTOMERS WITH UNPAID BILLS:");
+        List<Customer> unpaidCustomers = reportService.getCustomersWithUnpaidBills();
+        if (unpaidCustomers.isEmpty()) System.out.println("  No customers with unpaid bills.");
+        unpaidCustomers.forEach(c -> System.out.printf("  %s | %s%n", c.getCustomerNumber(), c.getFullName()));
+
+        System.out.println("------------------------------------------------------------");
 
         if (!revenue.isEmpty()) {
-            System.out.print("  Export revenue report to CSV? (Y/N): ");
+            System.out.print("Export revenue report to CSV (Y/N): ");
             String ans = scanner.nextLine().trim();
             if ("Y".equalsIgnoreCase(ans)) {
                 try {
                     String path = reportGenerator.exportRevenueSummaryToCsv(revenue, "revenue_summary.csv");
-                    System.out.println("  ✅ Revenue report exported to: " + path);
+                    System.out.println("  [OK] Revenue report exported to: " + path);
                 } catch (Exception e) {
-                    System.out.println("  ❌ Export failed: " + e.getMessage());
+                    System.out.println("  [Error] Export failed: " + e.getMessage());
                 }
             }
         }
     }
 
     private void showCustomerDistribution() {
-        System.out.println("\n┌─── CUSTOMER DISTRIBUTION BY CITY ───┐");
+        System.out.println("\nCUSTOMER DISTRIBUTION BY CITY");
         Map<String, List<Customer>> cityMap = reportService.getCustomersByCity();
         if (cityMap.isEmpty()) {
             System.out.println("  No customer data.");
         } else {
             cityMap.forEach((city, customers) -> {
-                System.out.println("  📍 " + city + " (" + customers.size() + " customers):");
+                System.out.println("   " + city + " (" + customers.size() + " customers):");
                 customers.forEach(c -> System.out.println("      → " + c.getFullName() + " [" + c.getCustomerNumber() + "]"));
             });
 
-            System.out.print("\n  Export full customer list to CSV? (Y/N): ");
+            System.out.print("\n  Export full customer list to CSV (Y/N): ");
             String ans = scanner.nextLine().trim();
             if ("Y".equalsIgnoreCase(ans)) {
                 try {
                     List<Customer> allCustomers = customerService.getAllCustomers();
                     String path = reportGenerator.exportCustomersToCsv(allCustomers, "customers_report.csv");
-                    System.out.println("  ✅ Customer list exported to: " + path);
+                    System.out.println("  [OK] Customer list exported to: " + path);
                 } catch (Exception e) {
-                    System.out.println("  ❌ Export failed: " + e.getMessage());
+                    System.out.println("  [Error] Export failed: " + e.getMessage());
                 }
             }
         }
-        System.out.println("└──────────────────────────────────────┘");
+        System.out.println("------------------------------------------------------------");
     }
 
     private void manageComplaints() {
         boolean inMenu = true;
         while (inMenu) {
-            System.out.println("\n╔══════════════════════════════════════╗");
-            System.out.println("║     CUSTOMER COMPLAINT MANAGEMENT    ║");
-            System.out.println("╠══════════════════════════════════════╣");
-            System.out.println("║  1. View All Complaints              ║");
-            System.out.println("║  2. View Pending Complaints (OPEN)   ║");
-            System.out.println("║  3. View Complaint Details           ║");
-            System.out.println("║  4. Resolve / Update a Complaint     ║");
-            System.out.println("║  5. Back to Admin Dashboard          ║");
-            System.out.println("╚══════════════════════════════════════╝");
+            ConsoleMenu.show("CUSTOMER COMPLAINT MANAGEMENT", null,
+                    "1. View All Complaints", "2. View Open Complaints", "3. View Complaint Details",
+                    "4. Resolve / Update a Complaint", "5. Back to Admin Dashboard");
             System.out.print("Select option: ");
             if (!scanner.hasNextLine()) break;
 
@@ -528,10 +566,10 @@ public class AdminController {
                 all.stream().filter(c -> filterStatus.equalsIgnoreCase(c.getStatus())).toList() : all;
 
         String title = (filterStatus != null) ? "PENDING / OPEN CUSTOMER COMPLAINTS" : "ALL CUSTOMER COMPLAINTS";
-        System.out.println("\n┌─── " + title + " " + "─".repeat(Math.max(0, 85 - title.length())) + "┐");
+        System.out.println("\n------------------------------------------------------------" + title + " " + "------------------------------------------------------------".repeat(Math.max(0, 85 - title.length())) + "------------------------------------------------------------");
         if (list.isEmpty()) {
             System.out.println("  No complaints found matching criteria.");
-            System.out.println("└" + "─".repeat(90) + "┘");
+            System.out.println("------------------------------------------------------------" + "------------------------------------------------------------".repeat(90) + "------------------------------------------------------------");
             return;
         }
 
@@ -554,7 +592,7 @@ public class AdminController {
                     c.getStatus(),
                     dateStr);
         }
-        System.out.println("└" + "─".repeat(90) + "┘");
+        System.out.println("------------------------------------------------------------" + "------------------------------------------------------------".repeat(90) + "------------------------------------------------------------");
 
         long openCount = all.stream().filter(c -> "OPEN".equalsIgnoreCase(c.getStatus())).count();
         long inProgCount = all.stream().filter(c -> "IN_PROGRESS".equalsIgnoreCase(c.getStatus())).count();
@@ -570,7 +608,7 @@ public class AdminController {
 
         Optional<Complaint> opt = findComplaintByIdOrNumber(query);
         if (!opt.isPresent()) {
-            System.out.println("❌ Complaint not found for: " + query);
+            System.out.println("[Error] Complaint not found for: " + query);
             return;
         }
 
@@ -584,7 +622,7 @@ public class AdminController {
 
         Optional<Complaint> opt = findComplaintByIdOrNumber(query);
         if (!opt.isPresent()) {
-            System.out.println("❌ Complaint not found for: " + query);
+            System.out.println("[Error] Complaint not found for: " + query);
             return;
         }
 
@@ -607,21 +645,21 @@ public class AdminController {
         System.out.print("Solution: ");
         String resolution = scanner.nextLine().trim();
         if (resolution.isEmpty()) {
-            System.out.println("❌ Resolution description cannot be empty. Action cancelled.");
+            System.out.println("[Error] Resolution description cannot be empty. Action cancelled.");
             return;
         }
 
         try {
             boolean success = complaintService.resolveComplaint(cp.getComplaintId(), newStatus, resolution, loggedInAdmin.getUsername());
             if (success) {
-                System.out.println("\n✅ Complaint [" + cp.getComplaintNumber() + "] successfully updated to " + newStatus + "!");
+                System.out.println("\n[OK] Complaint [" + cp.getComplaintNumber() + "] successfully updated to " + newStatus + "!");
                 System.out.println("   Solution Logged : " + resolution);
                 System.out.println("   Customer Alert  : Notification automatically delivered to customer portal.");
             } else {
-                System.out.println("❌ Failed to update complaint status in database.");
+                System.out.println("[Error] Failed to update complaint status in database.");
             }
         } catch (Exception e) {
-            System.out.println("❌ Error: " + e.getMessage());
+            System.out.println("[Error] Error: " + e.getMessage());
         }
     }
 
@@ -638,62 +676,62 @@ public class AdminController {
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
         String dateStr = cp.getCreatedDate() != null ? cp.getCreatedDate().format(dtf) : "N/A";
         String statusSymbol = switch (cp.getStatus()) {
-            case "RESOLVED" -> "✅ RESOLVED";
-            case "CLOSED" -> "🔒 CLOSED";
-            case "IN_PROGRESS" -> "⚙️ IN_PROGRESS";
-            default -> "⏳ OPEN";
+            case "RESOLVED" -> "[OK] RESOLVED";
+            case "CLOSED" -> " CLOSED";
+            case "IN_PROGRESS" -> " IN_PROGRESS";
+            default -> "[Pending] OPEN";
         };
 
-        System.out.println("\n╔══════════════════════════════════════════════════════════════════════════╗");
-        System.out.println("║                    COMPLAINT & RESOLUTION DOSSIER                        ║");
-        System.out.println("╠══════════════════════════════════════════════════════════════════════════╣");
-        System.out.printf("║  Complaint ID    : %-53d ║%n", cp.getComplaintId());
-        System.out.printf("║  Ticket Number   : %-53s ║%n", cp.getComplaintNumber());
-        System.out.printf("║  Date Lodged     : %-53s ║%n", dateStr);
-        System.out.printf("║  Customer Name   : %-53s ║%n", (cp.getCustomerName() != null ? cp.getCustomerName() : "Cust #" + cp.getCustomerId()));
+        System.out.println("\n------------------------------------------------------------");
+        System.out.println("COMPLAINT & RESOLUTION DOSSIER");
+        System.out.println("------------------------------------------------------------");
+        System.out.printf("Complaint ID    : %-53d %n", cp.getComplaintId());
+        System.out.printf("Ticket Number   : %-53s %n", cp.getComplaintNumber());
+        System.out.printf("Date Lodged     : %-53s %n", dateStr);
+        System.out.printf("Customer Name   : %-53s %n", (cp.getCustomerName() != null ? cp.getCustomerName() : "Cust #" + cp.getCustomerId()));
         if (cp.getCustomerNumber() != null) {
-            System.out.printf("║  Customer Number : %-53s ║%n", cp.getCustomerNumber());
+            System.out.printf("Customer Number : %-53s %n", cp.getCustomerNumber());
         }
-        System.out.printf("║  Location / City : %-53s ║%n", (cp.getCustomerCity() != null ? cp.getCustomerCity() : "N/A"));
-        System.out.printf("║  Mobile Number   : %-53s ║%n", (cp.getMobileNumber() != null ? cp.getMobileNumber() : "N/A"));
-        System.out.printf("║  Category        : %-53s ║%n", cp.getCategory());
-        System.out.printf("║  Priority        : %-53s ║%n", cp.getPriority());
-        System.out.printf("║  Current Status  : %-53s ║%n", statusSymbol);
-        System.out.println("╠══════════════════════════════════════════════════════════════════════════╣");
-        System.out.println("║  CUSTOMER ISSUE DESCRIPTION:                                             ║");
+        System.out.printf("Location / City : %-53s %n", (cp.getCustomerCity() != null ? cp.getCustomerCity() : "N/A"));
+        System.out.printf("Mobile Number   : %-53s %n", (cp.getMobileNumber() != null ? cp.getMobileNumber() : "N/A"));
+        System.out.printf("Category        : %-53s %n", cp.getCategory());
+        System.out.printf("Priority        : %-53s %n", cp.getPriority());
+        System.out.printf("Current Status  : %-53s %n", statusSymbol);
+        System.out.println("------------------------------------------------------------");
+        System.out.println("CUSTOMER ISSUE DESCRIPTION:");
         printWrappedBoxText(cp.getDescription(), 70);
-        System.out.println("╠══════════════════════════════════════════════════════════════════════════╣");
-        System.out.println("║  OFFICIAL SOLUTION & ACTION TAKEN:                                       ║");
+        System.out.println("------------------------------------------------------------");
+        System.out.println("OFFICIAL SOLUTION & ACTION TAKEN:");
         if (cp.getResolution() != null && !cp.getResolution().trim().isEmpty()) {
             printWrappedBoxText(cp.getResolution(), 70);
         } else {
-            System.out.println("║  [No resolution recorded yet. Use Option 4 to resolve this complaint.]   ║");
+            System.out.println("[No resolution recorded yet. Use Option 4 to resolve this complaint.]");
         }
-        System.out.println("╚══════════════════════════════════════════════════════════════════════════╝");
+        System.out.println("------------------------------------------------------------");
     }
 
     private void printWrappedBoxText(String text, int maxWidth) {
         if (text == null || text.trim().isEmpty()) {
-            System.out.println("║  (None)                                                                  ║");
+            System.out.println("(None)");
             return;
         }
         String[] words = text.split("\\s+");
         StringBuilder currentLine = new StringBuilder();
         for (String w : words) {
             if (currentLine.length() + w.length() + 1 > maxWidth) {
-                System.out.printf("║  %-70s ║%n", currentLine.toString());
+                System.out.printf("%-70s %n", currentLine.toString());
                 currentLine.setLength(0);
             }
             if (currentLine.length() > 0) currentLine.append(" ");
             currentLine.append(w);
         }
         if (currentLine.length() > 0) {
-            System.out.printf("║  %-70s ║%n", currentLine.toString());
+            System.out.printf("%-70s %n", currentLine.toString());
         }
     }
 
     private void showComplaintHotspotsAndAnalytics() {
-        System.out.println("\n┌─── COMPLAINT HOTSPOTS & ANALYTICS ──────────────────────────────────────────┐");
+        System.out.println("\nCOMPLAINT HOTSPOTS & ANALYTICS");
         System.out.println("  Intelligence Report: Where Complaints Are Highest & Actionable Hotspots");
         System.out.println("  " + "-".repeat(76));
 
@@ -707,7 +745,7 @@ public class AdminController {
         int totalResolved = cityStats.values().stream().mapToInt(a -> a[3]).sum();
         double resolutionRate = grandTotal > 0 ? ((double) totalResolved / grandTotal) * 100.0 : 0.0;
 
-        System.out.printf("  📊 Overall System Metrics:%n");
+        System.out.printf("   Overall System Metrics:%n");
         System.out.printf("     • Total Complaints Filed : %d%n", grandTotal);
         System.out.printf("     • Pending / Open Issues  : %d%n", totalOpen);
         System.out.printf("     • In Progress Issues     : %d%n", totalInProg);
@@ -716,11 +754,11 @@ public class AdminController {
 
         if (grandTotal == 0) {
             System.out.println("  No customer complaints recorded in the system yet.");
-            System.out.println("└─────────────────────────────────────────────────────────────────────────────┘");
+            System.out.println("------------------------------------------------------------");
             return;
         }
 
-        System.out.println("  📍 1. COMPLAINT HOTSPOTS BY CITY / LOCATION (Where complaints are highest):");
+        System.out.println("   1. COMPLAINT HOTSPOTS BY CITY / LOCATION (Where complaints are highest):");
         System.out.printf("  %-4s %-16s %7s %6s %8s %8s %8s   %s%n",
                 "Rank", "City / Area", "Total", "Open", "In-Prog", "Resolved", "Share %", "Hotspot Level");
         System.out.println("  " + "-".repeat(76));
@@ -733,18 +771,18 @@ public class AdminController {
 
             String hotspotBadge;
             if (share >= 35.0 || c[0] >= 5) {
-                hotspotBadge = "🔥 HIGH HOTSPOT (Attention Required)";
+                hotspotBadge = " HIGH HOTSPOT (Attention Required)";
             } else if (share >= 20.0 || c[0] >= 3) {
-                hotspotBadge = "⚠️ MODERATE HOTSPOT";
+                hotspotBadge = "[Warning] MODERATE HOTSPOT";
             } else {
-                hotspotBadge = "🟢 NORMAL";
+                hotspotBadge = " NORMAL";
             }
 
             System.out.printf("  %-4d %-16s %7d %6d %8d %8d %7.1f%%   %s%n",
                     rank++, city, c[0], c[1], c[2], c[3], share, hotspotBadge);
         }
 
-        System.out.println("\n  🏷️ 2. COMPLAINT DISTRIBUTION BY PROBLEM CATEGORY:");
+        System.out.println("\n   2. COMPLAINT DISTRIBUTION BY PROBLEM CATEGORY:");
         System.out.printf("  %-16s %7s %6s %8s %8s %8s%n",
                 "Category", "Total", "Open", "In-Prog", "Resolved", "Share %");
         System.out.println("  " + "-".repeat(60));
@@ -757,7 +795,7 @@ public class AdminController {
                     cat, c[0], c[1], c[2], c[3], share);
         }
 
-        System.out.println("\n  👤 3. TOP COMPLAINANT CUSTOMERS (Customers raising the most complaints):");
+        System.out.println("\n   3. TOP COMPLAINANT CUSTOMERS (Customers raising the most complaints):");
         System.out.printf("  %-12s %-18s %-12s %-12s %6s %8s %8s%n",
                 "Cust No", "Customer Name", "City", "Mobile", "Total", "Pending", "Resolved");
         System.out.println("  " + "-".repeat(76));
@@ -780,7 +818,7 @@ public class AdminController {
 
         List<Map<String, Object>> multiComplaints = complaintService.getCustomersWithMultipleComplaints(2);
         if (!multiComplaints.isEmpty()) {
-            System.out.println("\n  ⚡ 4. FREQUENT COMPLAINANTS (SQL HAVING >= 2 Complaints Filter):");
+            System.out.println("\n   4. FREQUENT COMPLAINANTS (SQL HAVING >= 2 Complaints Filter):");
             System.out.printf("  %-12s %-20s %-14s %-14s %s%n", "Cust No", "Name", "City", "Mobile", "Complaints");
             System.out.println("  " + "-".repeat(68));
             for (Map<String, Object> map : multiComplaints) {
@@ -793,16 +831,16 @@ public class AdminController {
             }
         }
 
-        System.out.println("└─────────────────────────────────────────────────────────────────────────────┘");
+        System.out.println("------------------------------------------------------------");
 
-        System.out.print("  Export Complaint Hotspot & Analytics Report to CSV? (Y/N): ");
+        System.out.print("Export Complaint Hotspot & Analytics Report to CSV (Y/N): ");
         String ans = scanner.nextLine().trim();
         if ("Y".equalsIgnoreCase(ans)) {
             try {
                 String path = reportGenerator.exportComplaintHotspotsToCsv(cityStats, catStats, topCustomers, "complaint_hotspots_report.csv");
-                System.out.println("  ✅ Complaint hotspot report exported successfully to: " + path);
+                System.out.println("  [OK] Complaint hotspot report exported successfully to: " + path);
             } catch (Exception e) {
-                System.out.println("  ❌ Export failed: " + e.getMessage());
+                System.out.println("  [Error] Export failed: " + e.getMessage());
             }
         }
     }
@@ -810,7 +848,7 @@ public class AdminController {
     private void viewAuditLogs() {
         try {
             List<AuditLog> logs = auditDAO.getAuditLogs();
-            System.out.println("\n┌─── AUDIT LOGS ──────────────────────┐");
+            System.out.println("\nAUDIT LOGS");
             if (logs.isEmpty()) {
                 System.out.println("  No audit records.");
             } else {
@@ -818,9 +856,9 @@ public class AdminController {
                     System.out.println("  " + log);
                 }
             }
-            System.out.println("└──────────────────────────────────────┘");
+            System.out.println("------------------------------------------------------------");
         } catch (Exception e) {
-            System.out.println("❌ Error: " + e.getMessage());
+            System.out.println("[Error] Error: " + e.getMessage());
         }
     }
 
@@ -833,18 +871,18 @@ public class AdminController {
         try {
             Optional<Administrator> opt = adminDAO.findByUsername(username);
             if (!opt.isPresent()) {
-                System.out.println("❌ Admin username not found.");
+                System.out.println("[Error] Admin username not found.");
                 return;
             }
 
             Administrator admin = opt.get();
-            String otp = com.amdocs.telecom.security.OTPService.generateOtp(username);
-            System.out.println("📧 OTP sent to registered email [" + admin.getEmail() + "] (simulated): " + otp);
+            String otp = com.amdocs.telecom.security.OTPService.generateOtp("ADMIN:"+username);
+            System.out.println(" OTP sent to registered email [" + admin.getEmail() + "] (simulated): " + otp);
 
             System.out.print("Enter OTP: ");
             String enteredOtp = scanner.nextLine().trim();
-            if (!com.amdocs.telecom.security.OTPService.verifyOtp(username, enteredOtp)) {
-                System.out.println("❌ Invalid or expired OTP.");
+            if (!com.amdocs.telecom.security.OTPService.verifyOtp("ADMIN:"+username, enteredOtp)) {
+                System.out.println("[Error] Invalid or expired OTP.");
                 return;
             }
 
@@ -855,10 +893,10 @@ public class AdminController {
 
                 List<String> missing = PasswordUtil.getPasswordMissingRequirements(newPass);
                 if (!missing.isEmpty()) {
-                    System.out.println("⚠️ Password does not meet requirements:");
+                    System.out.println("[Warning] Password does not meet requirements:");
                     missing.forEach(m -> System.out.println("   • " + m));
                     if (attempt == 3) {
-                        System.out.println("❌ Maximum attempts reached. Password reset cancelled.");
+                        System.out.println("[Error] Maximum attempts reached. Password reset cancelled.");
                         return;
                     }
                     continue;
@@ -867,8 +905,10 @@ public class AdminController {
                 String hashed = PasswordUtil.hashPassword(newPass);
                 boolean updated = adminDAO.updatePassword(admin.getAdminId(), hashed);
                 if (updated) {
-                    adminDAO.updateAccountStatus(admin.getAdminId(), "ACTIVE");
-                    System.out.println("✅ Admin password reset successfully! Please login with your new password.");
+                    if("LOCKED".equals(admin.getAccountStatus())) adminDAO.updateAccountStatus(admin.getAdminId(), "ACTIVE");
+                    com.amdocs.telecom.security.LoginSecurity.clear(username,"ADMIN");
+                    new CustomerDAOImpl().logLoginAttempt(username,"ADMIN","127.0.0.1","RESET");
+                    System.out.println("[OK] Admin password reset successfully! Please login with your new password.");
                     AuditLog audit = new AuditLog();
                     audit.setEntityName("ADMIN");
                     audit.setEntityId(String.valueOf(admin.getAdminId()));
@@ -877,12 +917,12 @@ public class AdminController {
                     audit.setPerformedBy(username);
                     auditDAO.logAudit(audit);
                 } else {
-                    System.out.println("❌ Failed to update password in database.");
+                    System.out.println("[Error] Failed to update password in database.");
                 }
                 return;
             }
         } catch (SQLException e) {
-            System.out.println("❌ Database error: " + e.getMessage());
+            System.out.println("[Error] Database error: " + e.getMessage());
         }
     }
 
@@ -893,7 +933,7 @@ public class AdminController {
         if ("cancel".equalsIgnoreCase(currentPass) || currentPass.isEmpty()) return;
 
         if (!PasswordUtil.verifyPassword(currentPass, loggedInAdmin.getPasswordHash())) {
-            System.out.println("❌ Current password does not match.");
+            System.out.println("[Error] Current password does not match.");
             return;
         }
 
@@ -903,16 +943,16 @@ public class AdminController {
             if ("cancel".equalsIgnoreCase(newPass)) return;
 
             if (currentPass.equals(newPass)) {
-                System.out.println("⚠️ New password cannot be the same as current password.");
+                System.out.println("[Warning] New password cannot be the same as current password.");
                 continue;
             }
 
             List<String> missing = PasswordUtil.getPasswordMissingRequirements(newPass);
             if (!missing.isEmpty()) {
-                System.out.println("⚠️ Password does not meet requirements:");
+                System.out.println("[Warning] Password does not meet requirements:");
                 missing.forEach(m -> System.out.println("   • " + m));
                 if (attempt == 3) {
-                    System.out.println("❌ Maximum attempts reached. Password change cancelled.");
+                    System.out.println("[Error] Maximum attempts reached. Password change cancelled.");
                     return;
                 }
                 continue;
@@ -921,7 +961,7 @@ public class AdminController {
             System.out.print("Confirm New Password: ");
             String confirmPass = scanner.nextLine().trim();
             if (!newPass.equals(confirmPass)) {
-                System.out.println("❌ Passwords do not match. Please try again.");
+                System.out.println("[Error] Passwords do not match. Please try again.");
                 continue;
             }
 
@@ -930,7 +970,7 @@ public class AdminController {
                 boolean updated = adminDAO.updatePassword(loggedInAdmin.getAdminId(), hashed);
                 if (updated) {
                     loggedInAdmin.setPasswordHash(hashed);
-                    System.out.println("✅ Administrator password changed successfully!");
+                    System.out.println("[OK] Administrator password changed successfully!");
 
                     AuditLog audit = new AuditLog();
                     audit.setEntityName("ADMIN");
@@ -940,11 +980,11 @@ public class AdminController {
                     audit.setPerformedBy(loggedInAdmin.getUsername());
                     auditDAO.logAudit(audit);
                 } else {
-                    System.out.println("❌ Failed to update password in database.");
+                    System.out.println("[Error] Failed to update password in database.");
                 }
                 return;
             } catch (SQLException e) {
-                System.out.println("❌ Database error: " + e.getMessage());
+                System.out.println("[Error] Database error: " + e.getMessage());
                 return;
             }
         }
@@ -970,8 +1010,4 @@ public class AdminController {
         }
     }
 
-    private String padRight(String s, int n) {
-        if (s == null) s = "";
-        return String.format("%-" + n + "s", s.length() > n ? s.substring(0, n) : s);
-    }
 }
