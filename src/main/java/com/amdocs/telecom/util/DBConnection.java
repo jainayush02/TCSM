@@ -1,6 +1,7 @@
 package com.amdocs.telecom.util;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.sql.Connection;
@@ -16,26 +17,15 @@ import java.util.logging.Logger;
  * Targets MySQL primarily as required by the case study,
  * with automatic fallback to embedded H2 if MySQL Server is not running locally.
  *
- * FIX #4: Implements connection pooling to eliminate per-query TCP connection churn.
- * Uses a simple internal pool when HikariCP is unavailable, falling back to
- * DriverManager-based connections with connection reuse guidance.
- *
- * NOTE: For production deployment, add HikariCP dependency to pom.xml:
- * <dependency>
- *     <groupId>com.zaxxer</groupId>
- *     <artifactId>HikariCP</artifactId>
- *     <version>5.1.0</version>
- * </dependency>
- * Then uncomment the HikariCP sections below.
+ * Uses a small internal pool so DAO calls can reuse connections.
  */
 public class DBConnection {
 
     private static final Logger LOGGER = Logger.getLogger(DBConnection.class.getName());
-    private static volatile DBConnection instance;
-    private static Properties properties = new Properties();
+    private static final Properties properties = new Properties();
     private static boolean useFallbackH2 = false;
 
-    // FIX #4: Simple thread-safe connection pool using BlockingQueue
+    // Keep a small pool of reusable connections
     private static final int POOL_SIZE = 10;
     private static final java.util.concurrent.BlockingQueue<Connection> connectionPool =
             new java.util.concurrent.LinkedBlockingQueue<>(POOL_SIZE);
@@ -48,14 +38,11 @@ public class DBConnection {
     private DBConnection() {}
 
     public static DBConnection getInstance() {
-        if (instance == null) {
-            synchronized (DBConnection.class) {
-                if (instance == null) {
-                    instance = new DBConnection();
-                }
-            }
-        }
-        return instance;
+        return InstanceHolder.INSTANCE;
+    }
+
+    private static class InstanceHolder {
+        private static final DBConnection INSTANCE = new DBConnection();
     }
 
     private static void loadProperties() {
@@ -69,25 +56,24 @@ public class DBConnection {
     }
 
     /**
-     * FIX #4: Returns a pooled connection wrapper that returns to the pool on close().
-     * This avoids creating a new physical TCP connection on every DAO call.
+     * Returns a connection that goes back to the pool when closed.
      */
     public Connection getConnection() throws SQLException {
-        // Try to reuse a pooled connection
+        // Reuse a connection when one is available
         Connection pooled = connectionPool.poll();
         if (pooled != null) {
             try {
                 if (!pooled.isClosed() && pooled.isValid(2)) {
                     return new PooledConnectionWrapper(pooled, connectionPool);
                 }
-                // Connection is stale, close and create new
+                // Discard stale connections
                 pooled.close();
             } catch (SQLException e) {
-                // Ignore and create new
+                // Open a new connection if the pooled one cannot be checked
             }
         }
 
-        // Create a new physical connection
+        // Nothing usable was in the pool
         Connection raw = createRawConnection();
         return new PooledConnectionWrapper(raw, connectionPool);
     }
@@ -104,8 +90,10 @@ public class DBConnection {
                     System.getenv().getOrDefault("TCSMS_DB_USER", properties.getProperty("db.user", "root")),
                     System.getenv().getOrDefault("TCSMS_DB_PASSWORD", properties.getProperty("db.password", ""))
                 );
-            } catch (Exception e) {
-                LOGGER.info("MySQL connection unavailable (" + e.getMessage() + "). Switching to local fallback database.");
+            } catch (ClassNotFoundException | SQLException e) {
+                LOGGER.log(Level.INFO,
+                        "MySQL connection unavailable ({0}). Switching to local fallback database.",
+                        e.getMessage());
                 useFallbackH2 = true;
             }
         }
@@ -132,11 +120,12 @@ public class DBConnection {
 
     public static void testAndInitializeDatabase() {
         try (Connection conn = DBConnection.getInstance().getConnection()) {
-            LOGGER.info("Connected to database successfully: " + conn.getMetaData().getDatabaseProductName());
+            LOGGER.log(Level.INFO, "Connected to database successfully: {0}",
+                    conn.getMetaData().getDatabaseProductName());
             runScript(conn, "schema.sql");
             ensureAdministratorAccountStatusColumn(conn);
             runScript(conn, "seed.sql");
-        } catch (Exception e) {
+        } catch (SQLException e) {
             LOGGER.log(Level.SEVERE, "Failed to initialize database tables", e);
         }
     }
@@ -162,17 +151,22 @@ public class DBConnection {
                         try (Statement stmt = conn.createStatement()) {
                             stmt.execute(sql);
                         } catch (SQLException e) {
-                            // Suppress already-exists notices, log unexpected errors
+                            // Ignore duplicate-object errors, but keep unexpected ones visible
                             if (!e.getMessage().toLowerCase().contains("already exists")) {
-                                LOGGER.log(Level.FINE, "SQL Note on [" + sql.substring(0, Math.min(30, sql.length())) + "...]: " + e.getMessage());
+                                LOGGER.log(Level.FINE, "SQL note on [{0}...]: {1}",
+                                        new Object[] {
+                                                sql.substring(0, Math.min(30, sql.length())),
+                                                e.getMessage()
+                                        });
                             }
                         }
                     }
                     sb.setLength(0);
                 }
             }
-        } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Notice while running " + scriptPath + ": " + e.getMessage());
+        } catch (IOException e) {
+            LOGGER.log(Level.WARNING, "Notice while running {0}: {1}",
+                    new Object[] {scriptPath, e.getMessage()});
         }
     }
 
@@ -193,8 +187,7 @@ public class DBConnection {
     }
 
     /**
-     * FIX #4: Shuts down the connection pool by closing all pooled connections.
-     * Should be called during application shutdown.
+     * Closes all connections currently held by the pool.
      */
     public void shutdown() {
         Connection conn;
@@ -207,8 +200,7 @@ public class DBConnection {
     }
 
     /**
-     * FIX #4: Connection wrapper that returns the underlying connection to the pool
-     * instead of closing it, enabling connection reuse across DAO calls.
+     * Returns the underlying connection to the pool instead of closing it.
      */
     private static class PooledConnectionWrapper implements Connection {
         private final Connection delegate;

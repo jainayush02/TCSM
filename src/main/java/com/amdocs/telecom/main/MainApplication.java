@@ -8,25 +8,23 @@ import com.amdocs.telecom.util.DBConnection;
 import java.util.Scanner;
 
 /**
- * MainApplication - Entry point for the Telecom Customer & Subscription Management System (TCSMS).
- * Initializes the database connection, starts background services,
- * and presents the interactive console menu.
+ * Starts the application, database, background services, and console menu.
  */
 public class MainApplication {
 
     private static PaymentNotificationService notificationService;
 
     public static void main(String[] args) {
-        // Suppress verbose JUL logging from background threads so console UI remains clean
+        // Keep background logging from taking over the console
         java.util.logging.LogManager.getLogManager().reset();
         java.util.logging.Logger rootLogger = java.util.logging.Logger.getLogger("");
         rootLogger.setLevel(java.util.logging.Level.WARNING);
 
-        // Initialize Database (Schema + Seed Data)
+        // Set up the database and seed data
         DBConnection database = DBConnection.getInstance();
         System.out.println("Database initialized successfully: " + database.getActiveDatabaseName());
 
-        // Start background notification service
+        // Start payment notifications
         notificationService = new PaymentNotificationService();
         notificationService.start();
 
@@ -37,38 +35,37 @@ public class MainApplication {
             }
         }));
 
-        Scanner scanner = new Scanner(System.in);
-        boolean running = true;
+        try (Scanner scanner = new Scanner(System.in)) {
+            boolean running = true;
 
-        while (running) {
-            printMainMenu();
-            if (!scanner.hasNextLine()) {
-                System.out.println("\nExiting TCSMS...");
-                notificationService.shutdown();
-                break;
-            }
-            int choice = readInt(scanner);
-
-            switch (choice) {
-                case 1 -> {
-                    CustomerController customerController = new CustomerController(scanner);
-                    customerController.showLoginMenu();
-                }
-                case 2 -> {
-                    AdminController adminController = new AdminController(scanner);
-                    adminController.showLoginMenu();
-                }
-                case 3 -> {
-                    running = false;
-                    System.out.println("\nShutting down services...");
+            while (running) {
+                printMainMenu();
+                if (!scanner.hasNextLine()) {
+                    System.out.println("\nExiting TCSMS...");
                     notificationService.shutdown();
-                    System.out.println("Thank you for using TCSMS. Goodbye!");
+                    break;
                 }
-                default -> System.out.println("Invalid option. Please try again.");
+                int choice = readInt(scanner);
+
+                switch (choice) {
+                    case 1 -> {
+                        CustomerController customerController = new CustomerController(scanner);
+                        customerController.showLoginMenu();
+                    }
+                    case 2 -> {
+                        AdminController adminController = new AdminController(scanner);
+                        adminController.showLoginMenu();
+                    }
+                    case 3 -> {
+                        running = false;
+                        System.out.println("\nShutting down services...");
+                        notificationService.shutdown();
+                        System.out.println("Thank you for using TCSMS. Goodbye!");
+                    }
+                    default -> System.out.println("Invalid option. Please try again.");
+                }
             }
         }
-
-        scanner.close();
     }
 
     private static void printMainMenu() {
@@ -95,7 +92,7 @@ public class MainApplication {
             if (!scanner.hasNextLine()) return -1;
             String line = scanner.nextLine().trim();
             return Integer.parseInt(line);
-        } catch (Exception e) {
+        } catch (NumberFormatException e) {
             return -1;
         }
     }

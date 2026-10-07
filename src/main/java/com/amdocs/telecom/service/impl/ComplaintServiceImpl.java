@@ -20,7 +20,8 @@ import java.util.UUID;
 
 public class ComplaintServiceImpl implements ComplaintService {
 
-    private static final java.util.logging.Logger LOGGER = java.util.logging.Logger.getLogger(ComplaintServiceImpl.class.getName());
+    private static final java.util.logging.Logger LOGGER = java.util.logging.Logger
+            .getLogger(ComplaintServiceImpl.class.getName());
     private final ComplaintDAO complaintDAO;
 
     public ComplaintServiceImpl() {
@@ -46,7 +47,8 @@ public class ComplaintServiceImpl implements ComplaintService {
                     s1.setDescription("Slow 5G internet speeds and call drops during peak hours in South Mumbai.");
                     s1.setPriority("HIGH");
                     s1.setStatus("RESOLVED");
-                    s1.setResolution("Network cell tower 4B optimized and antenna reoriented. Speeds verified above 150 Mbps.");
+                    s1.setResolution(
+                            "Network cell tower 4B optimized and antenna reoriented. Speeds verified above 150 Mbps.");
                     s1.setCreatedDate(LocalDateTime.now().minusDays(3));
                     complaintDAO.save(s1);
 
@@ -77,7 +79,8 @@ public class ComplaintServiceImpl implements ComplaintService {
                     s4.setDescription("eSIM profile download QR code failed scanning twice.");
                     s4.setPriority("HIGH");
                     s4.setStatus("RESOLVED");
-                    s4.setResolution("Fresh eSIM activation QR profile regenerated and emailed to customer. Profile successfully installed.");
+                    s4.setResolution(
+                            "Fresh eSIM activation QR profile regenerated and emailed to customer. Profile successfully installed.");
                     s4.setCreatedDate(LocalDateTime.now().minusDays(4));
                     complaintDAO.save(s4);
 
@@ -88,13 +91,14 @@ public class ComplaintServiceImpl implements ComplaintService {
                     s5.setDescription("UPI transaction deducted twice during bill payment.");
                     s5.setPriority("CRITICAL");
                     s5.setStatus("RESOLVED");
-                    s5.setResolution("Duplicate transaction verified. Automatic refund initiated to original bank account via payment gateway.");
+                    s5.setResolution(
+                            "Duplicate transaction verified. Automatic refund initiated to original bank account via payment gateway.");
                     s5.setCreatedDate(LocalDateTime.now().minusDays(5));
                     complaintDAO.save(s5);
                 }
             }
-        } catch (Exception ignored) {
-            // Ignore seeding errors if any
+        } catch (SQLException e) {
+            LOGGER.log(java.util.logging.Level.WARNING, "Unable to seed sample complaints", e);
         }
     }
 
@@ -107,7 +111,8 @@ public class ComplaintServiceImpl implements ComplaintService {
         try {
             category = ComplaintCategory.valueOf(categoryStr.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new TelecomException("Invalid complaint category. Valid values: BILLING, NETWORK, SIM, PLAN, PAYMENT, OTHER");
+            throw new TelecomException(
+                    "Invalid complaint category. Valid values: BILLING, NETWORK, SIM, PLAN, PAYMENT, OTHER");
         }
 
         Complaint complaint = new Complaint();
@@ -126,13 +131,13 @@ public class ComplaintServiceImpl implements ComplaintService {
         }
     }
 
-    // FIX #2: Propagate database errors instead of silently returning empty collections
     @Override
     public List<Complaint> getCustomerComplaints(int customerId) {
         try {
             return complaintDAO.findByCustomerId(customerId);
         } catch (SQLException e) {
-            LOGGER.log(java.util.logging.Level.SEVERE, "Database error fetching complaints for customer: " + customerId, e);
+            LOGGER.log(java.util.logging.Level.SEVERE, "Database error fetching complaints for customer: " + customerId,
+                    e);
             throw new RuntimeException("Failed to retrieve customer complaints.", e);
         }
     }
@@ -147,7 +152,6 @@ public class ComplaintServiceImpl implements ComplaintService {
         }
     }
 
-    // FIX #2: Don't mask DB errors as 'not found'
     @Override
     public Optional<Complaint> getComplaintById(int complaintId) {
         try {
@@ -174,7 +178,8 @@ public class ComplaintServiceImpl implements ComplaintService {
     }
 
     @Override
-    public boolean resolveComplaint(int complaintId, String status, String resolution, String resolvedByAdmin) throws TelecomException {
+    public boolean resolveComplaint(int complaintId, String status, String resolution, String resolvedByAdmin)
+            throws TelecomException {
         if (resolution == null || resolution.trim().isEmpty()) {
             throw new TelecomException("Resolution details cannot be empty.");
         }
@@ -205,7 +210,10 @@ public class ComplaintServiceImpl implements ComplaintService {
                             complaint.getCategory(), complaint.getComplaintNumber(), cleanStatus, resolution.trim()));
                     notif.setStatus("UNREAD");
                     DAOFactory.getAuditAndNotificationDAO().createNotification(notif);
-                } catch (Exception ignored) {}
+                } catch (SQLException e) {
+                    LOGGER.log(java.util.logging.Level.WARNING,
+                            "Unable to create complaint notification", e);
+                }
 
                 // 2. Audit Trail
                 try {
@@ -217,7 +225,9 @@ public class ComplaintServiceImpl implements ComplaintService {
                             complaint.getComplaintNumber(), complaint.getCategory(), cleanStatus, resolution.trim()));
                     audit.setPerformedBy(resolvedByAdmin != null ? resolvedByAdmin : "ADMIN");
                     DAOFactory.getAuditAndNotificationDAO().logAudit(audit);
-                } catch (Exception ignored) {}
+                } catch (SQLException e) {
+                    LOGGER.log(java.util.logging.Level.WARNING, "Unable to write complaint audit log", e);
+                }
 
                 return true;
             }
