@@ -11,7 +11,6 @@ public class UsageRecord {
     private String unit; // Minutes, SMS Count, GB, MB
     private double charge;
 
-    // Joined metadata
     private String mobileNumber;
 
     public UsageRecord() {}

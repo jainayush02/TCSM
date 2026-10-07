@@ -8,7 +8,7 @@ public class UpiPaymentStrategy implements PaymentStrategy {
         if (amount <= 0) {
             throw new TelecomException("UPI transaction amount must be greater than zero.");
         }
-        // UPI daily limit simulation: max 100,000 per txn
+        // Apply the UPI per-transaction limit.
         if (amount > 100000) {
             throw new TelecomException("UPI transaction limit exceeded (Max: ₹100,000 per transaction).");
         }

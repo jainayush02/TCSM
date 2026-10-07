@@ -1,9 +1,7 @@
--- ====================================================
--- TELECOM CUSTOMER & SUBSCRIPTION MANAGEMENT SYSTEM (TCSMS)
--- Database Schema Definition (Normalized Relational DB)
--- ====================================================
+-- TCSMS database schema
+-- Normalized relational schema
 
--- 1. Customers Table
+-- Customers Table
 CREATE TABLE IF NOT EXISTS customers (
     customer_id INT AUTO_INCREMENT PRIMARY KEY,
     customer_number VARCHAR(20) NOT NULL UNIQUE,
@@ -21,7 +19,7 @@ CREATE TABLE IF NOT EXISTS customers (
     account_status VARCHAR(20) DEFAULT 'ACTIVE'
 );
 
--- 2. Administrators Table
+-- Administrators Table
 CREATE TABLE IF NOT EXISTS administrators (
     admin_id INT AUTO_INCREMENT PRIMARY KEY,
     admin_number VARCHAR(20) NOT NULL UNIQUE,
@@ -35,7 +33,7 @@ CREATE TABLE IF NOT EXISTS administrators (
 
 ALTER TABLE administrators ADD COLUMN IF NOT EXISTS account_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE';
 
--- 3. Telecom Tariff Plans Table
+-- Telecom Tariff Plans Table
 CREATE TABLE IF NOT EXISTS telecom_plans (
     plan_id INT AUTO_INCREMENT PRIMARY KEY,
     plan_code VARCHAR(30) NOT NULL UNIQUE,
@@ -52,7 +50,7 @@ CREATE TABLE IF NOT EXISTS telecom_plans (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 4. SIM Cards Table
+-- SIM Cards Table
 CREATE TABLE IF NOT EXISTS sim_cards (
     sim_id INT AUTO_INCREMENT PRIMARY KEY,
     sim_number VARCHAR(30) NOT NULL UNIQUE,
@@ -62,7 +60,7 @@ CREATE TABLE IF NOT EXISTS sim_cards (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 5. Mobile Subscriptions Table
+-- Mobile Subscriptions Table
 CREATE TABLE IF NOT EXISTS mobile_subscriptions (
     subscription_id INT AUTO_INCREMENT PRIMARY KEY,
     subscription_number VARCHAR(30) NOT NULL UNIQUE,
@@ -80,7 +78,7 @@ CREATE TABLE IF NOT EXISTS mobile_subscriptions (
     FOREIGN KEY (sim_id) REFERENCES sim_cards(sim_id) ON DELETE RESTRICT
 );
 
--- 6. Subscription History Table
+-- Subscription History Table
 CREATE TABLE IF NOT EXISTS subscription_history (
     history_id INT AUTO_INCREMENT PRIMARY KEY,
     subscription_id INT NOT NULL,
@@ -94,7 +92,7 @@ CREATE TABLE IF NOT EXISTS subscription_history (
     FOREIGN KEY (new_plan_id) REFERENCES telecom_plans(plan_id) ON DELETE RESTRICT
 );
 
--- 7. Usage Records Table
+-- Usage Records Table
 CREATE TABLE IF NOT EXISTS usage_records (
     usage_id INT AUTO_INCREMENT PRIMARY KEY,
     subscription_id INT NOT NULL,
@@ -106,7 +104,7 @@ CREATE TABLE IF NOT EXISTS usage_records (
     FOREIGN KEY (subscription_id) REFERENCES mobile_subscriptions(subscription_id) ON DELETE CASCADE
 );
 
--- 8. Bills Table
+-- Bills Table
 CREATE TABLE IF NOT EXISTS bills (
     bill_id INT AUTO_INCREMENT PRIMARY KEY,
     bill_number VARCHAR(50) NOT NULL UNIQUE,
@@ -126,7 +124,7 @@ CREATE TABLE IF NOT EXISTS bills (
 CREATE UNIQUE INDEX IF NOT EXISTS uq_bill_subscription_month
     ON bills(subscription_id, billing_month);
 
--- 9. Payments Table
+-- Payments Table
 CREATE TABLE IF NOT EXISTS payments (
     payment_id INT AUTO_INCREMENT PRIMARY KEY,
     transaction_reference VARCHAR(50) NOT NULL UNIQUE,
@@ -140,7 +138,7 @@ CREATE TABLE IF NOT EXISTS payments (
     FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON DELETE RESTRICT
 );
 
--- 10. Customer Complaints Table
+-- Customer Complaints Table
 CREATE TABLE IF NOT EXISTS complaints (
     complaint_id INT AUTO_INCREMENT PRIMARY KEY,
     complaint_number VARCHAR(30) NOT NULL UNIQUE,
@@ -156,7 +154,7 @@ CREATE TABLE IF NOT EXISTS complaints (
     FOREIGN KEY (subscription_id) REFERENCES mobile_subscriptions(subscription_id) ON DELETE SET NULL
 );
 
--- 11. Login History & Security Table
+-- Login History & Security Table
 CREATE TABLE IF NOT EXISTS login_history (
     login_id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL,
@@ -166,7 +164,7 @@ CREATE TABLE IF NOT EXISTS login_history (
     status VARCHAR(20) NOT NULL
 );
 
--- 12. Audit Logs Table
+-- Audit Logs Table
 CREATE TABLE IF NOT EXISTS audit_logs (
     audit_id INT AUTO_INCREMENT PRIMARY KEY,
     entity_name VARCHAR(50) NOT NULL,
@@ -177,7 +175,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     performed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 13. Notifications Table
+-- Notifications Table
 CREATE TABLE IF NOT EXISTS notifications (
     notification_id INT AUTO_INCREMENT PRIMARY KEY,
     customer_id INT NOT NULL,

@@ -39,7 +39,7 @@ public class ComplaintServiceImpl implements ComplaintService {
                     Customer c2 = customers.size() > 1 ? customers.get(1) : c1;
                     Customer c3 = customers.size() > 2 ? customers.get(2) : c1;
 
-                    // Seed realistic complaints across different categories and cities
+                    // Seed complaints across categories and cities.
                     Complaint s1 = new Complaint();
                     s1.setComplaintNumber("CMP-1001A1");
                     s1.setCustomerId(c1.getCustomerId());
@@ -201,7 +201,6 @@ public class ComplaintServiceImpl implements ComplaintService {
         try {
             boolean updated = complaintDAO.updateStatusAndResolution(complaintId, cleanStatus, resolution.trim());
             if (updated) {
-                // 1. Send Notification to Customer
                 try {
                     Notification notif = new Notification();
                     notif.setCustomerId(complaint.getCustomerId());
@@ -215,7 +214,6 @@ public class ComplaintServiceImpl implements ComplaintService {
                             "Unable to create complaint notification", e);
                 }
 
-                // 2. Audit Trail
                 try {
                     AuditLog audit = new AuditLog();
                     audit.setEntityName("COMPLAINT");

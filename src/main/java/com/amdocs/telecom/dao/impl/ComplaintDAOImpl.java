@@ -223,7 +223,7 @@ public class ComplaintDAOImpl implements ComplaintDAO {
     @Override
     public List<java.util.Map<String, Object>> getCustomersWithMultipleComplaints(int minComplaints) throws SQLException {
         List<java.util.Map<String, Object>> list = new ArrayList<>();
-        // Demonstrates SQL GROUP BY, HAVING, JOIN, ORDER BY, and AGGREGATE functions
+        // Group and aggregate complaint data for the report.
         String sql = "SELECT c.customer_id, c.customer_number, CONCAT(c.first_name, ' ', c.last_name) as customer_name, " +
                 "c.city, c.mobile_number, COUNT(cp.complaint_id) as complaint_count " +
                 "FROM customers c " +

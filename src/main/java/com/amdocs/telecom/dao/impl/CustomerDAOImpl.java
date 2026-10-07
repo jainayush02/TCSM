@@ -186,7 +186,7 @@ public class CustomerDAOImpl implements CustomerDAO {
 
     @Override
     public int getRecentFailedLoginAttempts(String username, int withinMinutes) throws SQLException {
-        // Count consecutive failures since the last successful login within the specified time window
+        // Count failures since the last successful login.
         String sql = "SELECT COUNT(*) FROM login_history WHERE username = ? AND status = 'FAILED' " +
                 "AND login_timestamp >= TIMESTAMPADD(MINUTE, -?, CURRENT_TIMESTAMP) " +
                 "AND login_timestamp > COALESCE((SELECT MAX(login_timestamp) FROM login_history WHERE username = ? AND status = 'SUCCESS'), '1970-01-01 00:00:00')";

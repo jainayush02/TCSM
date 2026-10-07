@@ -47,8 +47,8 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     public Payment processPayment(int billId, int customerId, double amount, String paymentModeStr, String processedBy) throws TelecomException {
-        // FIX #5: Validate payment mode and execute strategy BEFORE acquiring DB lock
-        // This minimizes lock hold time and reduces deadlock risk.
+        // Validate payment mode and execute strategy before acquiring DB lock
+        // This keeps the lock short and reduces deadlock risk.
         PaymentMode mode;
         try {
             mode = PaymentMode.valueOf(paymentModeStr.toUpperCase());
@@ -64,7 +64,7 @@ public class PaymentServiceImpl implements PaymentService {
             conn = DBConnection.getInstance().getConnection();
             conn.setAutoCommit(false); // BEGIN JDBC TRANSACTION
 
-            // 1. Validate Bill (acquires FOR UPDATE lock)
+            // Lock and validate the bill.
             Optional<Bill> billOpt = billingDAO.findById(conn, billId);
             if (!billOpt.isPresent()) {
                 throw new TelecomException("Bill not found.");
@@ -77,7 +77,6 @@ public class PaymentServiceImpl implements PaymentService {
                 throw new TelecomException("Bill is already paid. Duplicate payment not allowed.");
             }
 
-            // 2. FIX #1: Validate Amount using BigDecimal for financial precision
             BigDecimal paymentAmount = BigDecimal.valueOf(amount).setScale(2, RoundingMode.HALF_UP);
             BigDecimal billTotal = BigDecimal.valueOf(bill.getTotalAmount()).setScale(2, RoundingMode.HALF_UP);
             if (paymentAmount.compareTo(billTotal) != 0) {
@@ -86,7 +85,7 @@ public class PaymentServiceImpl implements PaymentService {
                         paymentAmount.toPlainString(), billTotal.toPlainString()));
             }
 
-            // 3. Create Payment Record
+            // Create the payment record.
             String txnRef = "TXN" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
             Payment payment = new Payment();
             payment.setTransactionReference(txnRef);
@@ -99,10 +98,10 @@ public class PaymentServiceImpl implements PaymentService {
 
             Payment savedPayment = paymentDAO.save(conn, payment);
 
-            // 4. Update Bill Status
+            // Update the bill status.
             billingDAO.updateStatus(conn, billId, "PAID");
 
-            // 5. Create Audit Record
+            // Create the audit record.
             AuditLog audit = new AuditLog();
             audit.setEntityName("PAYMENT");
             audit.setEntityId(String.valueOf(savedPayment.getPaymentId()));
@@ -111,7 +110,6 @@ public class PaymentServiceImpl implements PaymentService {
             audit.setPerformedBy(processedBy);
             auditDAO.logAudit(conn, audit);
 
-            // COMMIT — releases all row locks
             conn.commit();
             if (notificationService != null) {
                 notificationService.sendNotification(customerId, "Payment received",
@@ -120,7 +118,7 @@ public class PaymentServiceImpl implements PaymentService {
             return savedPayment;
 
         } catch (SQLException | TelecomException e) {
-            // ROLLBACK on Failure
+            // Roll back if any step fails.
             if (conn != null) {
                 try {
                     conn.rollback();

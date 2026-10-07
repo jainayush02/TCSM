@@ -34,7 +34,7 @@ public class UsageServiceImpl implements UsageService {
         this.auditDAO = DAOFactory.getAuditAndNotificationDAO();
     }
 
-    // FIX #2: Method now throws TelecomException instead of returning null on failure
+    // Propagate failures instead of returning null.
     @Override
     public UsageRecord recordUsage(int subscriptionId, String usageTypeStr, double quantity, String unit) {
         if (quantity <= 0) {
@@ -45,7 +45,7 @@ public class UsageServiceImpl implements UsageService {
         }
         try {
             UsageType usageType = UsageType.valueOf(usageTypeStr.toUpperCase());
-            // In a real system, calculate charge based on Plan rates. Here we assume 0 or a flat rate for demo.
+            // The demo uses a flat charge; production would use plan rates.
             double charge = 0.0;
             if (usageType == UsageType.ROAMING) charge = quantity * 0.5; // Example charge
             
@@ -73,7 +73,7 @@ public class UsageServiceImpl implements UsageService {
         } catch (IllegalArgumentException e) {
             throw new RuntimeException("Invalid usage type: " + usageTypeStr, e);
         } catch (SQLException e) {
-            // FIX #2: Do NOT return null — throw with root cause preserved for proper upstream handling
+            // Throw the original database error instead of returning null.
             LOGGER.log(Level.SEVERE, "Database error recording usage for subscription: " + subscriptionId, e);
             throw new RuntimeException("Failed to record usage due to a database error. Please retry.", e);
         }

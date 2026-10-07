@@ -3,15 +3,6 @@ package com.amdocs.telecom.security;
 import org.mindrot.jbcrypt.BCrypt;
 import java.util.regex.Pattern;
 
-/**
- * Handles password hashing and complexity enforcement.
- * Business Rule: Password must satisfy defined complexity rules:
- * - At least 8 characters
- * - At least 1 uppercase letter
- * - At least 1 lowercase letter
- * - At least 1 digit
- * - At least 1 special character (@#$%^&+=!)
- */
 public class PasswordUtil {
 
     private static final String PASSWORD_PATTERN =

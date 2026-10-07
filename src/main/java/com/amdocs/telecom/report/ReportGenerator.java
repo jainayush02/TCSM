@@ -14,10 +14,6 @@ import java.util.DoubleSummaryStatistics;
 import java.util.List;
 import java.util.Map;
 
-/**
- * ReportGenerator handles file operations including CSV data exports
- * and formatted text invoices as required by the case study specification.
- */
 public class ReportGenerator {
 
     private static final String DEFAULT_REPORT_DIR = "reports";
@@ -33,16 +29,12 @@ public class ReportGenerator {
         }
     }
 
-    /**
-     * Exports customer records to a CSV file.
-     */
     public String exportCustomersToCsv(List<Customer> customers, String fileName) throws Exception {
         ensureReportDirectoryExists();
         String targetPath = DEFAULT_REPORT_DIR + File.separator + fileName;
         try (BufferedWriter writer = new BufferedWriter(
                 new OutputStreamWriter(new FileOutputStream(targetPath), StandardCharsets.UTF_8))) {
             
-            // CSV Header
             writer.write("CustomerId,CustomerNumber,FullName,Email,MobileNumber,City,AccountStatus,RegistrationDate\n");
             
             for (Customer c : customers) {
@@ -62,16 +54,12 @@ public class ReportGenerator {
         return new File(targetPath).getAbsolutePath();
     }
 
-    /**
-     * Exports monthly revenue summary statistics to a CSV file.
-     */
     public String exportRevenueSummaryToCsv(Map<String, DoubleSummaryStatistics> revenueData, String fileName) throws Exception {
         ensureReportDirectoryExists();
         String targetPath = DEFAULT_REPORT_DIR + File.separator + fileName;
         try (BufferedWriter writer = new BufferedWriter(
                 new OutputStreamWriter(new FileOutputStream(targetPath), StandardCharsets.UTF_8))) {
             
-            // CSV Header
             writer.write("BillingMonth,TotalBills,TotalRevenue,AverageBillAmount,MinBillAmount,MaxBillAmount\n");
             
             for (Map.Entry<String, DoubleSummaryStatistics> entry : revenueData.entrySet()) {
@@ -90,9 +78,6 @@ public class ReportGenerator {
         return new File(targetPath).getAbsolutePath();
     }
 
-    /**
-     * Generates a printable text format invoice for a customer bill.
-     */
     public String generateBillInvoiceText(Bill bill, Customer customer, String fileName) throws Exception {
         return generateBillInvoiceText(bill, customer, null, null, null, fileName);
     }
@@ -151,9 +136,6 @@ public class ReportGenerator {
         return new File(targetPath).getAbsolutePath();
     }
 
-    /**
-     * Generates a standard, self-contained PDF 1.4 invoice that opens in any PDF reader.
-     */
     public String generateBillInvoicePdf(Bill bill, Customer customer, String planName, String paymentMode, String txnRef, String fileName) throws Exception {
         ensureReportDirectoryExists();
         String targetPath = DEFAULT_REPORT_DIR + File.separator + fileName;
@@ -162,11 +144,9 @@ public class ReportGenerator {
 
         StringBuilder sb = new StringBuilder();
 
-        // 1. Header Banner (Navy blue background)
         sb.append("0.05 0.15 0.35 rg\n"); // Navy blue
         sb.append("40 705 532 55 re f\n");
 
-        // Header Title (White text)
         sb.append("1 1 1 rg\n");
         sb.append("BT\n");
         sb.append("/F2 16 Tf\n");
@@ -177,7 +157,6 @@ public class ReportGenerator {
         sb.append("(OFFICIAL TAX INVOICE & PAYMENT RECEIPT) Tj\n");
         sb.append("ET\n");
 
-        // 2. Status Stamp Box
         boolean isPaid = "PAID".equalsIgnoreCase(bill.getBillStatus());
         if (isPaid) {
             sb.append("0.1 0.6 0.2 rg\n"); // Green
@@ -191,7 +170,6 @@ public class ReportGenerator {
             sb.append("BT\n/F2 13 Tf\n478 728 Td\n(UNPAID) Tj\nET\n");
         }
 
-        // 3. Invoice Metadata Card
         sb.append("0.95 0.95 0.97 rg\n"); // Light gray background
         sb.append("40 620 532 75 re f\n");
         sb.append("0.8 0.8 0.85 RG\n"); // Border
@@ -209,7 +187,6 @@ public class ReportGenerator {
         sb.append(String.format("(Due Date: %s   |   Status: %s) Tj\n", escapePdf(String.valueOf(bill.getDueDate())), escapePdf(bill.getBillStatus())));
         sb.append("ET\n");
 
-        // 4. Customer & Plan Information Card
         sb.append("0.95 0.95 0.97 rg\n");
         sb.append("40 510 532 100 re f\n");
         sb.append("0.8 0.8 0.85 RG\n");
@@ -234,13 +211,11 @@ public class ReportGenerator {
         sb.append(String.format("(Subscribed Plan: %s) Tj\n", escapePdf(planName != null ? planName : "Telecom Plan")));
         sb.append("ET\n");
 
-        // 5. Charges Table
         sb.append("0.05 0.15 0.35 rg\n");
         sb.append("40 460 532 24 re f\n"); // Table header
         sb.append("1 1 1 rg\n");
         sb.append("BT\n/F2 10 Tf\n55 468 Td\n(Description) Tj\n380 0 Td\n(Amount \\(INR\\)) Tj\nET\n");
 
-        // Table Rows
         sb.append("0 0 0 rg\n");
         sb.append("BT\n/F1 10 Tf\n");
         sb.append("55 438 Td\n(1. Monthly Plan Base Rental) Tj\n380 0 Td\n");
@@ -255,10 +230,8 @@ public class ReportGenerator {
         }
         sb.append("ET\n");
 
-        // Line separator
         sb.append("0.7 0.7 0.7 RG\n1 w\n40 360 532 0 re S\n");
 
-        // Total Amount Row
         sb.append("0.9 0.95 1.0 rg\n");
         sb.append("40 325 532 30 re f\n");
         sb.append("0.05 0.15 0.35 RG\n2 w\n40 325 532 30 re S\n");
@@ -268,7 +241,6 @@ public class ReportGenerator {
         sb.append(String.format("(INR %10.2f) Tj\n", bill.getTotalAmount()));
         sb.append("ET\n");
 
-        // 6. Payment Information Section
         sb.append("0 0 0 rg\n");
         sb.append("BT\n/F2 11 Tf\n55 295 Td\n(Payment Details) Tj\n/F1 10 Tf\n");
         if (isPaid) {
@@ -290,7 +262,6 @@ public class ReportGenerator {
         }
         sb.append("ET\n");
 
-        // 7. Footer
         sb.append("0.5 0.5 0.5 rg\n");
         sb.append("BT\n/F1 9 Tf\n");
         sb.append("55 80 Td\n");
@@ -299,7 +270,6 @@ public class ReportGenerator {
         sb.append("(This is a computer-generated tax invoice. No signature required.) Tj\n");
         sb.append("ET\n");
 
-        // Assemble PDF file
         byte[] streamBytes = sb.toString().getBytes(StandardCharsets.ISO_8859_1);
         java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
         List<Long> offsets = new ArrayList<>();
@@ -342,9 +312,6 @@ public class ReportGenerator {
         return new File(targetPath).getAbsolutePath();
     }
 
-    /**
-     * Generates a modern printable HTML invoice that can be opened and printed/saved as PDF in any browser.
-     */
     public String generateBillInvoiceHtml(Bill bill, Customer customer, String planName, String paymentMode, String txnRef, String fileName) throws Exception {
         ensureReportDirectoryExists();
         String targetPath = DEFAULT_REPORT_DIR + File.separator + fileName;
@@ -441,9 +408,6 @@ public class ReportGenerator {
         return new File(targetPath).getAbsolutePath();
     }
 
-    /**
-     * Exports complaint hotspots & distribution analytics to a CSV file.
-     */
     public String exportComplaintHotspotsToCsv(Map<String, int[]> cityStats, Map<String, int[]> catStats, List<Map<String, Object>> topCustomers, String fileName) throws Exception {
         ensureReportDirectoryExists();
         String targetPath = DEFAULT_REPORT_DIR + File.separator + fileName;
@@ -452,7 +416,6 @@ public class ReportGenerator {
 
             writer.write("# AMDOCS TCSMS - COMPLAINT HOTSPOTS & ANALYTICS REPORT\n\n");
 
-            // Section 1: By City
             writer.write("--- COMPLAINTS BY LOCATION / CITY ---\n");
             writer.write("City,TotalComplaints,Open,InProgress,Resolved\n");
             for (Map.Entry<String, int[]> entry : cityStats.entrySet()) {
@@ -460,7 +423,6 @@ public class ReportGenerator {
                 writer.write(String.format("\"%s\",%d,%d,%d,%d\n", entry.getKey(), counts[0], counts[1], counts[2], counts[3]));
             }
 
-            // Section 2: By Category
             writer.write("\n--- COMPLAINTS BY CATEGORY ---\n");
             writer.write("Category,TotalComplaints,Open,InProgress,Resolved\n");
             for (Map.Entry<String, int[]> entry : catStats.entrySet()) {
@@ -468,7 +430,6 @@ public class ReportGenerator {
                 writer.write(String.format("\"%s\",%d,%d,%d,%d\n", entry.getKey(), counts[0], counts[1], counts[2], counts[3]));
             }
 
-            // Section 3: Top Complainants
             writer.write("\n--- TOP COMPLAINANT CUSTOMERS ---\n");
             writer.write("CustomerId,CustomerNumber,FullName,City,MobileNumber,TotalComplaints,Pending,Resolved\n");
             for (Map<String, Object> map : topCustomers) {

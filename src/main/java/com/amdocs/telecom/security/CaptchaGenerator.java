@@ -2,9 +2,6 @@ package com.amdocs.telecom.security;
 
 import java.security.SecureRandom;
 
-/**
- * Generates alphanumeric CAPTCHA codes for login authentication security.
- */
 public class CaptchaGenerator {
 
     private static final String CHARACTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";

@@ -59,15 +59,9 @@ public class BillingDAOImpl implements BillingDAO {
         return Optional.empty();
     }
 
-    /**
-     * FIX #5: Split FOR UPDATE query to avoid multi-table lock escalation.
-     * Step 1: Lock ONLY the bill row in the 'bills' table.
-     * Step 2: Fetch joined display fields (customer name, mobile number) with a regular SELECT.
-     * This prevents deadlocks caused by concurrent transactions locking customers/subscriptions.
-     */
     @Override
     public Optional<Bill> findById(Connection conn, int billId) throws SQLException {
-        // Step 1: Lock only the bill row — single-table lock, no join
+        // Step 1: Lock only the bill row - single-table lock, no join
         String lockSql = "SELECT * FROM bills WHERE bill_id = ? FOR UPDATE";
         Bill bill = null;
         try (PreparedStatement ps = conn.prepareStatement(lockSql)) {
@@ -97,7 +91,7 @@ public class BillingDAOImpl implements BillingDAO {
             return Optional.empty();
         }
 
-        // Step 2: Fetch joined display fields WITHOUT locking other tables
+        // Step 2: Fetch joined display fields without locking other tables
         String joinSql = "SELECT ms.mobile_number, ms.customer_id, c.customer_number, " +
                 "CONCAT(c.first_name, ' ', c.last_name) AS customer_name " +
                 "FROM mobile_subscriptions ms " +

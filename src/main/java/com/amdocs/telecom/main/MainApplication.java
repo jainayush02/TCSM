@@ -7,24 +7,18 @@ import com.amdocs.telecom.util.DBConnection;
 
 import java.util.Scanner;
 
-/**
- * Starts the application, database, background services, and console menu.
- */
 public class MainApplication {
 
     private static PaymentNotificationService notificationService;
 
     public static void main(String[] args) {
-        // Keep background logging from taking over the console
         java.util.logging.LogManager.getLogManager().reset();
         java.util.logging.Logger rootLogger = java.util.logging.Logger.getLogger("");
         rootLogger.setLevel(java.util.logging.Level.WARNING);
 
-        // Set up the database and seed data
         DBConnection database = DBConnection.getInstance();
         System.out.println("Database initialized successfully: " + database.getActiveDatabaseName());
 
-        // Start payment notifications
         notificationService = new PaymentNotificationService();
         notificationService.start();
 

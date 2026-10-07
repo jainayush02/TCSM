@@ -76,7 +76,7 @@ public class UsageDAOImpl implements UsageDAO {
     @Override
     public List<UsageRecord> findBySubscriptionAndMonth(int subscriptionId, String yearMonth) throws SQLException {
         List<UsageRecord> list = new ArrayList<>();
-        // Format of yearMonth: "2026-08"
+        // The billing month uses yyyy-MM format.
         String sql = "SELECT * FROM usage_records WHERE subscription_id = ? AND " +
                 "SUBSTRING(CAST(usage_date AS CHAR), 1, 7) = ? ORDER BY usage_date ASC";
         try (Connection conn = DBConnection.getInstance().getConnection();

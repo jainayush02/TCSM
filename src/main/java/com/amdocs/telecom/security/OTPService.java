@@ -5,10 +5,6 @@ import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * OTPService for OTP-based password recovery.
- * Generates 6-digit OTPs with a 5-minute expiration window.
- */
 public class OTPService {
 
     private static final SecureRandom RANDOM = new SecureRandom();

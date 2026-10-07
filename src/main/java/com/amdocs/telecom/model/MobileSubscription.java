@@ -16,7 +16,6 @@ public class MobileSubscription {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    // Joined fields for display
     private String planCode;
     private String planName;
     private double monthlyRental;

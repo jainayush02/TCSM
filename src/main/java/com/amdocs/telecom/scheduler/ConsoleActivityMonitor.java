@@ -10,10 +10,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-/**
- * Polls the shared audit table so an administrator can observe activity
- * performed by other console processes using the same local database.
- */
 public class ConsoleActivityMonitor {
 
     private ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();

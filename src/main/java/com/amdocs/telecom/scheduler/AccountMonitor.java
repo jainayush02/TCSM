@@ -18,12 +18,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
-/**
- * AccountMonitor uses Callable and Future to concurrently scan
- * for overdue accounts and optionally suspend them.
- * 
- * Demonstrates: Callable<T>, Future<T>, ExecutorService, get(), isDone().
- */
 public class AccountMonitor {
 
     private static final Logger LOGGER = Logger.getLogger(AccountMonitor.class.getName());
@@ -37,14 +31,9 @@ public class AccountMonitor {
         this.subscriptionDAO = new SubscriptionDAOImpl();
     }
 
-    /**
-     * Scans for overdue accounts using Callable/Future pattern.
-     * Returns a list of overdue bill summaries.
-     */
     public List<String> scanOverdueAccounts() {
         System.out.println("\n[AccountMonitor] Scanning for overdue accounts...");
 
-        // Task 1: Find unpaid bills past due date
         Callable<List<Bill>> overdueScanTask = () -> {
             LOGGER.info("[AccountMonitor-Task1] Scanning unpaid bills...");
             List<Bill> unpaid = billingDAO.findUnpaidBills();
@@ -53,7 +42,6 @@ public class AccountMonitor {
                     .collect(Collectors.toList());
         };
 
-        // Task 2: Mark overdue bills
         Callable<Integer> markOverdueTask = () -> {
             LOGGER.info("[AccountMonitor-Task2] Marking overdue bills...");
             List<Bill> unpaid = billingDAO.findUnpaidBills();
@@ -75,7 +63,7 @@ public class AccountMonitor {
             Future<List<Bill>> overdueFuture = executor.submit(overdueScanTask);
             Future<Integer> markFuture = executor.submit(markOverdueTask);
 
-            // Wait for scan result
+            // Wait for the scan to finish.
             List<Bill> overdueBills = overdueFuture.get(15, TimeUnit.SECONDS);
             System.out.println("[AccountMonitor] Found " + overdueBills.size() + " overdue bill(s):");
 
@@ -89,7 +77,7 @@ public class AccountMonitor {
                 System.out.println(summary);
             }
 
-            // Wait for marking result
+            // Wait for the status updates to finish.
             Integer markedCount = markFuture.get(15, TimeUnit.SECONDS);
             System.out.println("[AccountMonitor] Bills marked as OVERDUE: " + markedCount);
             results.add("Total marked OVERDUE: " + markedCount);
@@ -102,9 +90,6 @@ public class AccountMonitor {
         return results;
     }
 
-    /**
-     * Suspends subscriptions that have overdue bills beyond a threshold (e.g., 30 days).
-     */
     public int suspendDelinquentAccounts(int overdueDaysThreshold) {
         System.out.println("[AccountMonitor] Suspending accounts with bills overdue > " + overdueDaysThreshold + " days...");
 

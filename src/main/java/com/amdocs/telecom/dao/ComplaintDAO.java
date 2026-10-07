@@ -14,7 +14,6 @@ public interface ComplaintDAO {
     List<Complaint> findAll() throws SQLException;
     boolean updateStatusAndResolution(int complaintId, String status, String resolution) throws SQLException;
     
-    // Hotspot and analytics methods
     Map<String, int[]> getComplaintsCountByCity() throws SQLException;
     Map<String, int[]> getComplaintsCountByCategory() throws SQLException;
     List<Map<String, Object>> getTopCustomersByComplaints(int limit) throws SQLException;

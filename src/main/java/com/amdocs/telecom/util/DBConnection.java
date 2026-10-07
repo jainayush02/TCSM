@@ -12,20 +12,12 @@ import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- * Database connection manager with connection pooling support.
- * Targets MySQL primarily as required by the case study,
- * with automatic fallback to embedded H2 if MySQL Server is not running locally.
- *
- * Uses a small internal pool so DAO calls can reuse connections.
- */
 public class DBConnection {
 
     private static final Logger LOGGER = Logger.getLogger(DBConnection.class.getName());
     private static final Properties properties = new Properties();
     private static boolean useFallbackH2 = false;
 
-    // Keep a small pool of reusable connections
     private static final int POOL_SIZE = 10;
     private static final java.util.concurrent.BlockingQueue<Connection> connectionPool =
             new java.util.concurrent.LinkedBlockingQueue<>(POOL_SIZE);
@@ -55,32 +47,22 @@ public class DBConnection {
         }
     }
 
-    /**
-     * Returns a connection that goes back to the pool when closed.
-     */
     public Connection getConnection() throws SQLException {
-        // Reuse a connection when one is available
         Connection pooled = connectionPool.poll();
         if (pooled != null) {
             try {
                 if (!pooled.isClosed() && pooled.isValid(2)) {
                     return new PooledConnectionWrapper(pooled, connectionPool);
                 }
-                // Discard stale connections
                 pooled.close();
             } catch (SQLException e) {
-                // Open a new connection if the pooled one cannot be checked
             }
         }
 
-        // Nothing usable was in the pool
         Connection raw = createRawConnection();
         return new PooledConnectionWrapper(raw, connectionPool);
     }
 
-    /**
-     * Creates a raw JDBC connection (physical TCP connection).
-     */
     private Connection createRawConnection() throws SQLException {
         if (!useFallbackH2) {
             try {
@@ -151,7 +133,7 @@ public class DBConnection {
                         try (Statement stmt = conn.createStatement()) {
                             stmt.execute(sql);
                         } catch (SQLException e) {
-                            // Ignore duplicate-object errors, but keep unexpected ones visible
+                            // Ignore duplicate-object errors; surface anything unexpected.
                             if (!e.getMessage().toLowerCase().contains("already exists")) {
                                 LOGGER.log(Level.FINE, "SQL note on [{0}...]: {1}",
                                         new Object[] {
@@ -186,9 +168,6 @@ public class DBConnection {
         }
     }
 
-    /**
-     * Closes all connections currently held by the pool.
-     */
     public void shutdown() {
         Connection conn;
         while ((conn = connectionPool.poll()) != null) {
@@ -199,9 +178,6 @@ public class DBConnection {
         LOGGER.info("Connection pool shut down.");
     }
 
-    /**
-     * Returns the underlying connection to the pool instead of closing it.
-     */
     private static class PooledConnectionWrapper implements Connection {
         private final Connection delegate;
         private final java.util.concurrent.BlockingQueue<Connection> pool;
@@ -217,24 +193,23 @@ public class DBConnection {
             if (!closed) {
                 closed = true;
                 try {
-                    // Reset connection state before returning to pool
+                    // Reset the connection before returning it to the pool.
                     if (!delegate.isClosed()) {
                         if (!delegate.getAutoCommit()) {
                             delegate.setAutoCommit(true);
                         }
-                        // Try to return to pool; if pool is full, close the physical connection
+                        // Return it to the pool or close it when the pool is full.
                         if (!pool.offer(delegate)) {
                             delegate.close();
                         }
                     }
                 } catch (SQLException e) {
-                    // If reset fails, close the physical connection
+                    // Close the physical connection if reset fails.
                     try { delegate.close(); } catch (SQLException ignored) {}
                 }
             }
         }
 
-        // Delegate all Connection interface methods to the underlying connection
         @Override public Statement createStatement() throws SQLException { return delegate.createStatement(); }
         @Override public java.sql.PreparedStatement prepareStatement(String sql) throws SQLException { return delegate.prepareStatement(sql); }
         @Override public java.sql.CallableStatement prepareCall(String sql) throws SQLException { return delegate.prepareCall(sql); }

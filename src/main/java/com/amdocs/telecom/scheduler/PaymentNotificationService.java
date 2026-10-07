@@ -12,15 +12,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- * PaymentNotificationService uses a BlockingQueue and worker threads
- * to process payment notifications asynchronously.
- * 
- * Demonstrates: BlockingQueue, ExecutorService, Runnable, producer-consumer pattern.
- *
- * FIX #3: Increased queue capacity, added timed back-pressure with synchronous fallback
- * to prevent silent notification loss under queue saturation.
- */
 public class PaymentNotificationService {
 
     private static final Logger LOGGER = Logger.getLogger(PaymentNotificationService.class.getName());
@@ -38,18 +29,14 @@ public class PaymentNotificationService {
         this.notificationDAO = new AuditAndNotificationDAOImpl();
     }
 
-    /**
-     * Starts the consumer worker threads that continuously poll the queue.
-     */
     public void start() {
         for (int i = 0; i < 3; i++) {
             final int workerId = i + 1;
             workerPool.submit((Runnable) () -> {
                 LOGGER.info("[NotificationWorker-" + workerId + "] Started.");
-                // FIX #3: Continue draining queue after shutdown signal to prevent message loss
+                // Drain the queue before stopping so queued notifications are not lost.
                 while (running || !notificationQueue.isEmpty()) {
                     try {
-                        // Blocks until a notification is available, with 2-second timeout
                         Notification notif = notificationQueue.poll(2, TimeUnit.SECONDS);
                         if (notif != null) {
                             processNotification(notif, workerId);
@@ -65,12 +52,6 @@ public class PaymentNotificationService {
         LOGGER.info("[PaymentNotificationService] Started with 3 worker threads.");
     }
 
-    /**
-     * Producer method: enqueues a notification for async processing.
-     *
-     * FIX #3: Uses timed offer() with back-pressure. If queue remains saturated
-     * after timeout, falls back to synchronous DB persistence to guarantee zero message loss.
-     */
     public void sendNotification(int customerId, String title, String message) {
         Notification notif = new Notification();
         notif.setCustomerId(customerId);
@@ -80,7 +61,7 @@ public class PaymentNotificationService {
 
         boolean enqueued = false;
         try {
-            // FIX #3: Timed back-pressure — wait up to 500ms for queue space
+            // Wait up to 500 ms for queue space.
             enqueued = notificationQueue.offer(notif, ENQUEUE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -90,16 +71,12 @@ public class PaymentNotificationService {
         if (enqueued) {
             LOGGER.info("[PaymentNotificationService] Notification queued for customer " + customerId);
         } else {
-            // FIX #3: BACK-PRESSURE FALLBACK — persist synchronously instead of dropping
+            // Persist synchronously instead of dropping the notification.
             LOGGER.severe("[PaymentNotificationService] Queue saturated! Executing synchronous fallback for customer: " + customerId);
             executeEmergencyPersistence(notif);
         }
     }
 
-    /**
-     * FIX #3: Emergency synchronous persistence — guarantees notification is saved
-     * even when the async queue is full, preventing silent message loss.
-     */
     private void executeEmergencyPersistence(Notification notif) {
         try {
             notificationDAO.createNotification(notif);

@@ -17,9 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
-/**
- * CustomerController handles the interactive customer portal menu.
- */
 public class CustomerController {
 
     private final AuthenticationService authService;
@@ -87,7 +84,7 @@ public class CustomerController {
             System.out.println("Username: " + username);
         }
 
-        // Early check: Verify username or email exists in database before asking for password
+        // Check the account before requesting a password.
         if (!customerService.isUserRegistered(username)) {
             System.out.println("❌ User '" + username + "' is not registered. Please register first or check your username/email.");
             return false;
@@ -97,7 +94,7 @@ public class CustomerController {
         String password = scanner.nextLine().trim();
         if ("cancel".equalsIgnoreCase(password)) return false;
 
-        // CAPTCHA verification with 3 retries
+        // Allow three CAPTCHA attempts.
         String captchaInput = null;
         String expectedCaptcha = null;
         for (int cAttempt = 1; cAttempt <= 3; cAttempt++) {
@@ -132,7 +129,6 @@ public class CustomerController {
         System.out.println("\n--- New Customer Registration ---");
         System.out.println("(Tips: Type 'cancel' at any prompt to return to menu)\n");
 
-        // 1. First Name
         String firstName = "";
         while (firstName.isEmpty()) {
             System.out.print("First Name: ");
@@ -143,7 +139,6 @@ public class CustomerController {
             }
         }
 
-        // 2. Last Name
         String lastName = "";
         while (lastName.isEmpty()) {
             System.out.print("Last Name: ");
@@ -154,7 +149,6 @@ public class CustomerController {
             }
         }
 
-        // 3. Date of Birth with 3 attempts and age check
         LocalDate dob = null;
         for (int attempt = 1; attempt <= 3; attempt++) {
             System.out.print("Date of Birth (yyyy-MM-dd, e.g. 2004-07-02): ");
@@ -177,7 +171,6 @@ public class CustomerController {
             }
         }
 
-        // 4. Email with 3 attempts
         String email = "";
         for (int attempt = 1; attempt <= 3; attempt++) {
             System.out.print("Email: ");
@@ -194,7 +187,6 @@ public class CustomerController {
             }
         }
 
-        // 5. Mobile Number with 3 attempts
         String mobile = "";
         for (int attempt = 1; attempt <= 3; attempt++) {
             System.out.print("Mobile Number (10-15 digits): ");
@@ -211,7 +203,6 @@ public class CustomerController {
             }
         }
 
-        // 6. Address, City, Country
         System.out.print("Address: ");
         String address = scanner.nextLine().trim();
         if ("cancel".equalsIgnoreCase(address)) return;
@@ -227,7 +218,6 @@ public class CustomerController {
         if ("cancel".equalsIgnoreCase(country)) return;
         if (country.isEmpty()) country = "India";
 
-        // 7. Username
         String username = "";
         while (username.isEmpty()) {
             System.out.print("Username: ");
@@ -238,7 +228,6 @@ public class CustomerController {
             }
         }
 
-        // 8. Password with 3 attempts and detailed feedback
         String password = "";
         for (int attempt = 1; attempt <= 3; attempt++) {
             System.out.print("Password (Min 8 chars, 1 Upper, 1 Lower, 1 Digit, 1 Special @#$%^&+=!): ");
@@ -262,7 +251,6 @@ public class CustomerController {
             }
         }
 
-        // Submit Registration
         try {
             CustomerRegistrationDTO dto = new CustomerRegistrationDTO(firstName, lastName, dob,
                     email, mobile, address, city, country, username, password);
@@ -294,7 +282,6 @@ public class CustomerController {
             String otp = authService.initiatePasswordRecovery(username);
             System.out.println("📧 OTP sent (simulated): " + otp);
 
-            // OTP validation with 3 attempts
             String otpInput = "";
             boolean otpValid = false;
             for (int attempt = 1; attempt <= 3; attempt++) {
@@ -315,7 +302,6 @@ public class CustomerController {
 
             if (!otpValid) return;
 
-            // New password with complexity validation loop
             String newPassword = "";
             for (int attempt = 1; attempt <= 3; attempt++) {
                 System.out.print("Enter new password: ");
@@ -483,14 +469,12 @@ public class CustomerController {
             System.out.println("   Mobile Number   : " + sub.getMobileNumber());
             System.out.println("   SIM Type        : " + simType);
 
-            // Fetch plan information
             TelecomPlan chosenPlan = null;
             try {
                 chosenPlan = planService.getPlanById(planId);
             } catch (Exception ignored) {}
             String planName = (chosenPlan != null ? chosenPlan.getPlanName() + " (" + chosenPlan.getPlanCode() + ")" : "Plan #" + planId);
 
-            // Fetch auto-generated initial bill for this subscription
             List<Bill> bills = billingService.getCustomerBills(loggedInCustomer.getCustomerId());
             Bill newBill = bills.stream()
                     .filter(b -> b.getSubscriptionId() == sub.getSubscriptionId())
@@ -736,7 +720,6 @@ public class CustomerController {
             System.out.println("  [✓] Bank authentication successful!");
 
         } else {
-            // Default UPI
             paymentMode = "UPI";
             System.out.print("Enter your UPI ID (e.g. " + loggedInCustomer.getUsername() + "@oksbi / 9876543210@upi): ");
             String upiId = scanner.nextLine().trim();
@@ -761,7 +744,6 @@ public class CustomerController {
                     loggedInCustomer.getUsername()
             );
 
-            // Print the full console bill
             printConsoleReceipt(target, payment, transactionType, planName, mobileNumber, paymentInstrumentDetail);
             offerDownloadInvoice(target, payment, planName, mobileNumber, paymentInstrumentDetail);
             return payment;
@@ -882,7 +864,6 @@ public class CustomerController {
             if (usage.size() > 20) System.out.println("  ... and " + (usage.size() - 20) + " more records.");
         }
 
-        // Show summary using Streams
         List<MobileSubscription> subs = subscriptionService.getCustomerSubscriptions(loggedInCustomer.getCustomerId());
         for (MobileSubscription sub : subs) {
             Map<String, Double> summary = usageService.getUsageSummary(sub.getSubscriptionId());

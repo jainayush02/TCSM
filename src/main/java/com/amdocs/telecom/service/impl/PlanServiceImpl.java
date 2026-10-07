@@ -77,7 +77,6 @@ public class PlanServiceImpl implements PlanService {
     @Override
     public List<TelecomPlan> filterPlansByPriceRange(double minPrice, double maxPrice) {
         List<TelecomPlan> plans = getAllActivePlans();
-        // Java 8 Predicate chaining
         Predicate<TelecomPlan> atLeastMin = p -> p.getMonthlyRental() >= minPrice;
         Predicate<TelecomPlan> atMostMax = p -> p.getMonthlyRental() <= maxPrice;
         return plans.stream()
@@ -87,7 +86,6 @@ public class PlanServiceImpl implements PlanService {
 
     @Override
     public TelecomPlan getPlanById(int planId) throws TelecomException {
-        // Java 8 Supplier for exception generation
         Supplier<TelecomException> notFoundSupplier = () -> new TelecomException("Plan not found with ID: " + planId);
         try {
             Optional<TelecomPlan> opt = planDAO.findById(planId);
@@ -102,9 +100,7 @@ public class PlanServiceImpl implements PlanService {
         TelecomPlan plan1 = getPlanById(planId1);
         TelecomPlan plan2 = getPlanById(planId2);
         
-        // Java 8 Function for formatting comparison summaries
         Function<TelecomPlan, String> summaryFunc = p -> String.format("%s (₹%.2f, %dGB)", p.getPlanName(), p.getMonthlyRental(), p.getDataAllowanceGB());
-        // Java 8 Consumer for auditing comparison operations
         Consumer<String> auditConsumer = msg -> java.util.logging.Logger.getLogger(PlanServiceImpl.class.getName()).info(msg);
         auditConsumer.accept("Comparing: " + summaryFunc.apply(plan1) + " vs " + summaryFunc.apply(plan2));
         

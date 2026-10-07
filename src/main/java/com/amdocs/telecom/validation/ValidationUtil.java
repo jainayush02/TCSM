@@ -22,9 +22,6 @@ public class ValidationUtil {
         return PHONE_PATTERN.matcher(mobile.trim()).matches();
     }
 
-    /**
-     * Checks if customer satisfies minimum age requirements (e.g., 18 years old).
-     */
     public static boolean isEligibleAge(LocalDate dob, int minAge) {
         if (dob == null) return false;
         return Period.between(dob, LocalDate.now()).getYears() >= minAge;

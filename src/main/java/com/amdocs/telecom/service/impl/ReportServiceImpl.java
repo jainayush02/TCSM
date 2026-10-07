@@ -47,11 +47,11 @@ public class ReportServiceImpl implements ReportService {
 
     @Override
     public List<Customer> getHighestConsumingCustomers() {
-        // Find customers with highest total bill amounts using Stream API
+        // Find customers with the highest total bills.
         try {
             List<Bill> allBills = billingDAO.findAll();
             
-            // Group bills by customer ID and calculate total amount
+            // Group bills by customer and total the amounts.
             Map<Integer, Double> customerTotals = allBills.stream()
                     .collect(Collectors.groupingBy(
                             Bill::getCustomerId,
@@ -60,7 +60,7 @@ public class ReportServiceImpl implements ReportService {
 
             List<Customer> allCustomers = customerDAO.findAll();
             
-            // Sort customers by their total bill amount descending
+            // Sort customers by total bill amount, highest first.
             return allCustomers.stream()
                     .sorted((c1, c2) -> Double.compare(
                             customerTotals.getOrDefault(c2.getCustomerId(), 0.0),
@@ -79,7 +79,6 @@ public class ReportServiceImpl implements ReportService {
         try {
             List<Customer> allCustomers = customerDAO.findAll();
             
-            // Java 8 Collectors.groupingBy
             return allCustomers.stream()
                     .collect(Collectors.groupingBy(Customer::getCity));
         } catch (SQLException e) {
@@ -92,7 +91,6 @@ public class ReportServiceImpl implements ReportService {
         try {
             List<Bill> allBills = billingDAO.findAll();
             
-            // Java 8 Collectors.summarizingDouble
             return allBills.stream()
                     .filter(b -> "PAID".equals(b.getBillStatus())) // only count paid bills as revenue
                     .collect(Collectors.groupingBy(
@@ -129,20 +127,19 @@ public class ReportServiceImpl implements ReportService {
             List<MobileSubscription> subscriptions = subscriptionDAO.findAll();
             List<TelecomPlan> plans = planDAO.findAll();
 
-            // Create plan lookup map using Java 8 Function
             Function<TelecomPlan, Integer> planKeyMapper = TelecomPlan::getPlanId;
             Map<Integer, TelecomPlan> planMap = plans.stream()
                     .collect(Collectors.toMap(planKeyMapper, Function.identity(), (p1, p2) -> p1));
 
-            // Java 8 Stream API: group by plan ID and count subscribers
+            // Group subscriptions by plan and count them.
             Map<Integer, Long> subscriberCounts = subscriptions.stream()
                     .collect(Collectors.groupingBy(MobileSubscription::getPlanId, Collectors.counting()));
 
-            // Java 8 Supplier providing default empty list if no subscriptions
+            // Use an empty list when there are no subscriptions.
             Supplier<List<Map<String, Object>>> emptyListSupplier = Collections::emptyList;
             if (subscriberCounts.isEmpty()) return emptyListSupplier.get();
 
-            // Transform, sort descending by subscriber count, and collect
+            // Sort by subscriber count and collect the results.
             return subscriberCounts.entrySet().stream()
                     .sorted(Map.Entry.<Integer, Long>comparingByValue().reversed())
                     .map(entry -> {
@@ -167,17 +164,17 @@ public class ReportServiceImpl implements ReportService {
             List<Bill> allBills = billingDAO.findAll();
             List<Customer> allCustomers = customerDAO.findAll();
 
-            // Java 8 Predicate for unpaid/overdue bills
+            // Filter unpaid and overdue bills.
             Predicate<Bill> isUnpaidOrOverdue = b -> "UNPAID".equalsIgnoreCase(b.getBillStatus())
                     || "OVERDUE".equalsIgnoreCase(b.getBillStatus());
 
-            // Extract customer IDs with unpaid bills using Stream API
+            // Collect customer IDs for unpaid bills.
             Set<Integer> unpaidCustomerIds = allBills.stream()
                     .filter(isUnpaidOrOverdue)
                     .map(Bill::getCustomerId)
                     .collect(Collectors.toSet());
 
-            // Java 8 Predicate for filtering customers
+            // Filter customers with unpaid bills.
             Predicate<Customer> hasUnpaidBill = c -> unpaidCustomerIds.contains(c.getCustomerId());
 
             return allCustomers.stream()
@@ -193,7 +190,7 @@ public class ReportServiceImpl implements ReportService {
         try {
             List<UsageRecord> records = usageDAO.findAll();
 
-            // Java 8 Stream API groupingBy usage type and summing quantity
+            // Group usage by type and sum the quantities.
             return records.stream()
                     .collect(Collectors.groupingBy(
                             r -> r.getUsageType().name(),

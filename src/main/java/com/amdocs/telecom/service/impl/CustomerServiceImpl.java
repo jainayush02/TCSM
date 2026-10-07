@@ -30,7 +30,6 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     public Customer registerCustomer(CustomerRegistrationDTO dto) throws ValidationException {
-        // Business Rules Validation
         if (!ValidationUtil.isNotEmpty(dto.getFirstName()) || !ValidationUtil.isNotEmpty(dto.getLastName())) {
             throw new ValidationException("First Name and Last Name are mandatory.");
         }
@@ -115,7 +114,7 @@ public class CustomerServiceImpl implements CustomerService {
         }
     }
 
-    // FIX #2: Return 'true' (fail-safe) on DB error to prevent duplicate registrations
+    // Treat database errors as possible duplicate registrations.
     @Override
     public boolean isUsernameRegistered(String username) {
         try {
@@ -126,7 +125,7 @@ public class CustomerServiceImpl implements CustomerService {
         }
     }
 
-    // FIX #2: Return 'true' (fail-safe) on DB error
+    // Treat database errors as possible duplicates.
     @Override
     public boolean isUserRegistered(String usernameOrEmail) {
         try {

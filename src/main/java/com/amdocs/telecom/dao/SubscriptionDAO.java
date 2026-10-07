@@ -18,7 +18,6 @@ public interface SubscriptionDAO {
     boolean changePlan(int subscriptionId, int newPlanId, String reason, String changedBy) throws SQLException;
     List<SubscriptionHistory> getHistory(int subscriptionId) throws SQLException;
 
-    // SIM operations
     SIMCard saveSIM(SIMCard sim) throws SQLException;
     Optional<SIMCard> findAvailableSIM(String simType) throws SQLException;
     List<SIMCard> findAllSIMs() throws SQLException;

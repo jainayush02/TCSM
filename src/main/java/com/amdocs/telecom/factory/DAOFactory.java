@@ -3,10 +3,6 @@ package com.amdocs.telecom.factory;
 import com.amdocs.telecom.dao.*;
 import com.amdocs.telecom.dao.impl.*;
 
-/**
- * Factory Design Pattern for instantiating Data Access Objects (DAOs).
- * Decouples client components from concrete DAO implementation classes.
- */
 public class DAOFactory {
 
     private DAOFactory() {}

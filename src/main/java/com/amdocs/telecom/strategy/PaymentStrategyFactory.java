@@ -3,9 +3,6 @@ package com.amdocs.telecom.strategy;
 import com.amdocs.telecom.exception.TelecomException;
 import com.amdocs.telecom.model.PaymentMode;
 
-/**
- * Factory Pattern providing the appropriate PaymentStrategy based on selected payment mode.
- */
 public class PaymentStrategyFactory {
 
     private PaymentStrategyFactory() {}

@@ -15,11 +15,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- * BillingScheduler uses ScheduledExecutorService to run billing cycles
- * at fixed intervals. In production, this would run once per month.
- * For demonstration, it can be triggered manually or on a shorter interval.
- */
 public class BillingScheduler {
 
     private static final Logger LOGGER = Logger.getLogger(BillingScheduler.class.getName());
@@ -33,11 +28,6 @@ public class BillingScheduler {
         this.subscriptionDAO = new SubscriptionDAOImpl();
     }
 
-    /**
-     * Starts the billing scheduler to run periodically.
-     * @param initialDelay delay before first execution (seconds)
-     * @param period       interval between executions (seconds)
-     */
     public void start(long initialDelay, long period) {
         Runnable billingTask = () -> {
             String billingMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
@@ -60,7 +50,6 @@ public class BillingScheduler {
                         System.out.println("  [✓] Bill generated for Subscription: " + sub.getSubscriptionNumber());
                     } catch (Exception e) {
                         skipped++;
-                        // Bill may already exist for this month
                     }
                 }
                 System.out.println("[BillingScheduler] Cycle complete. Generated: " + generated + " | Skipped: " + skipped);
@@ -75,9 +64,6 @@ public class BillingScheduler {
         LOGGER.info("[BillingScheduler] Scheduled. Initial delay: " + initialDelay + "s, Period: " + period + "s");
     }
 
-    /**
-     * Triggers a single immediate billing run (useful for admin on-demand trigger).
-     */
     public void triggerNow() {
         String billingMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
         LOGGER.info("[BillingScheduler] Manual trigger for: " + billingMonth);
@@ -94,7 +80,6 @@ public class BillingScheduler {
                     generated++;
                     System.out.println("  [✓] Bill generated for: " + sub.getSubscriptionNumber());
                 } catch (Exception ignored) {
-                    // Already billed
                 }
             }
             System.out.println("[BillingScheduler] Manual run complete. Bills generated: " + generated);

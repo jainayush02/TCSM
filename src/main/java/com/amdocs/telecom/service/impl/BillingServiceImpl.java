@@ -45,7 +45,7 @@ public class BillingServiceImpl implements BillingService {
     @Override
     public Bill generateMonthlyBill(int subscriptionId, String billingMonth) throws TelecomException {
         try {
-            // Check if already billed
+            // Skip bills that already exist.
             Optional<Bill> existing = billingDAO.findBySubscriptionAndMonth(subscriptionId, billingMonth);
             if (existing.isPresent()) {
                 throw new TelecomException("Bill already generated for this month.");
@@ -57,7 +57,7 @@ public class BillingServiceImpl implements BillingService {
             }
             MobileSubscription sub = subOpt.get();
 
-            // FIX #1: BigDecimal for financial precision — avoids IEEE 754 rounding errors in tax/total
+            // Use BigDecimal to avoid rounding errors in tax and totals.
             BigDecimal usageChargesBD = BigDecimal.valueOf(usageDAO.getTotalUsageCharge(subscriptionId, billingMonth))
                     .setScale(2, RoundingMode.HALF_UP);
             BigDecimal planRentalBD = BigDecimal.valueOf(sub.getMonthlyRental())
@@ -104,7 +104,7 @@ public class BillingServiceImpl implements BillingService {
             }
             TelecomPlan plan = planOpt.get();
 
-            // FIX #1: BigDecimal for financial precision
+            // Use BigDecimal for financial calculations.
             BigDecimal planRentalBD = BigDecimal.valueOf(plan.getMonthlyRental()).setScale(2, RoundingMode.HALF_UP);
             BigDecimal taxAmountBD = planRentalBD.multiply(TAX_RATE).setScale(2, RoundingMode.HALF_UP);
             BigDecimal totalAmountBD = planRentalBD.add(taxAmountBD).setScale(2, RoundingMode.HALF_UP);
@@ -133,7 +133,7 @@ public class BillingServiceImpl implements BillingService {
         }
     }
 
-    // FIX #2: Propagate exceptions instead of silently returning empty lists
+    // Let database errors reach the caller.
     @Override
     public List<Bill> getCustomerBills(int customerId) {
         try {

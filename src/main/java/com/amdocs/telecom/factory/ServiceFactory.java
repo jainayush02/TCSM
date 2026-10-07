@@ -3,10 +3,6 @@ package com.amdocs.telecom.factory;
 import com.amdocs.telecom.service.*;
 import com.amdocs.telecom.service.impl.*;
 
-/**
- * Factory Design Pattern for instantiating Business Services.
- * Provides centralized service creation and lifecycle management.
- */
 public class ServiceFactory {
 
     private ServiceFactory() {}

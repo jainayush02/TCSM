@@ -11,7 +11,6 @@ public class SubscriptionHistory {
     private String changeReason;
     private String changedBy;
 
-    // Optional joined fields
     private String oldPlanName;
     private String newPlanName;
 

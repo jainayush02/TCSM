@@ -23,9 +23,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Scanner;
 
-/**
- * AdminController handles the telecom administrator portal menu.
- */
 public class AdminController {
 
     private final AdminDAO adminDAO;
@@ -86,7 +83,7 @@ public class AdminController {
         String username = scanner.nextLine().trim();
         if ("cancel".equalsIgnoreCase(username)) return false;
 
-        // Early check: Verify admin username exists in database before asking for password
+        // Check the account before requesting a password.
         try {
             if (!adminDAO.findByUsername(username).isPresent()) {
                 System.out.println("❌ Admin username '" + username + "' is not registered. Please check your username.");
@@ -101,7 +98,7 @@ public class AdminController {
         String password = scanner.nextLine().trim();
         if ("cancel".equalsIgnoreCase(password)) return false;
 
-        // CAPTCHA verification with 3 retries
+        // Allow three CAPTCHA attempts.
         String captchaInput = null;
         for (int cAttempt = 1; cAttempt <= 3; cAttempt++) {
             String captcha = CaptchaGenerator.generateCaptcha();
@@ -131,12 +128,11 @@ public class AdminController {
                 loggedInAdmin = opt.get();
                 adminDAO.updateAccountStatus(loggedInAdmin.getAdminId(), "ACTIVE");
                 
-                // Show last login timestamp before recording new login
+                // Show the previous login before recording this one.
                 Optional<String> lastLogin = new CustomerDAOImpl().getLastLoginTimestamp(username);
                 System.out.println("\n✅ Admin login successful! Welcome, " + loggedInAdmin.getFullName());
                 lastLogin.ifPresent(ts -> System.out.println("  🕒 Last Login Timestamp: " + ts));
 
-                // Log login
                 new CustomerDAOImpl().logLoginAttempt(username, "ADMIN", "127.0.0.1", "SUCCESS");
                 return true;
             } else {
@@ -413,7 +409,7 @@ public class AdminController {
         UsageProcessor processor = new UsageProcessor();
         processor.processBulkUsage(records, Math.max(count / 4, 10));
 
-        // Wait a moment for threads to finish
+        // Give background workers time to finish.
         try { Thread.sleep(3000); } catch (InterruptedException ignored) {}
         processor.shutdown();
     }
@@ -435,7 +431,7 @@ public class AdminController {
         double avgPerCustomer = reportService.getAverageMonthlyRevenuePerCustomer();
         System.out.printf("%n  Average Monthly Revenue per Customer: ₹%.2f%n", avgPerCustomer);
 
-        // Java 8 Stream API: Most Subscribed Plans
+        // Summarize the most subscribed plans with streams.
         List<Map<String, Object>> topPlans = reportService.getMostSubscribedPlans();
         if (!topPlans.isEmpty()) {
             System.out.println("\n  📈 MOST SUBSCRIBED PLANS (Java 8 Stream Grouping & Sorting):");
@@ -450,7 +446,7 @@ public class AdminController {
             }
         }
 
-        // Java 8 Stream API: Overall Usage by Type
+        // Summarize usage by type with streams.
         Map<String, Double> usageByType = reportService.getOverallUsageByType();
         if (!usageByType.isEmpty()) {
             System.out.println("\n  📊 TOTAL TELECOM USAGE BY TYPE (Java 8 Stream):");
@@ -724,7 +720,6 @@ public class AdminController {
             return;
         }
 
-        // Section 1: Hotspots by Location / City
         System.out.println("  📍 1. COMPLAINT HOTSPOTS BY CITY / LOCATION (Where complaints are highest):");
         System.out.printf("  %-4s %-16s %7s %6s %8s %8s %8s   %s%n",
                 "Rank", "City / Area", "Total", "Open", "In-Prog", "Resolved", "Share %", "Hotspot Level");
@@ -749,7 +744,6 @@ public class AdminController {
                     rank++, city, c[0], c[1], c[2], c[3], share, hotspotBadge);
         }
 
-        // Section 2: Distribution by Category
         System.out.println("\n  🏷️ 2. COMPLAINT DISTRIBUTION BY PROBLEM CATEGORY:");
         System.out.printf("  %-16s %7s %6s %8s %8s %8s%n",
                 "Category", "Total", "Open", "In-Prog", "Resolved", "Share %");
@@ -763,7 +757,6 @@ public class AdminController {
                     cat, c[0], c[1], c[2], c[3], share);
         }
 
-        // Section 3: Top Complainant Customers
         System.out.println("\n  👤 3. TOP COMPLAINANT CUSTOMERS (Customers raising the most complaints):");
         System.out.printf("  %-12s %-18s %-12s %-12s %6s %8s %8s%n",
                 "Cust No", "Customer Name", "City", "Mobile", "Total", "Pending", "Resolved");
@@ -785,7 +778,6 @@ public class AdminController {
                     mob, tot, pen, res);
         }
 
-        // Section 4: SQL HAVING Clause Demonstration
         List<Map<String, Object>> multiComplaints = complaintService.getCustomersWithMultipleComplaints(2);
         if (!multiComplaints.isEmpty()) {
             System.out.println("\n  ⚡ 4. FREQUENT COMPLAINANTS (SQL HAVING >= 2 Complaints Filter):");
@@ -803,7 +795,6 @@ public class AdminController {
 
         System.out.println("└─────────────────────────────────────────────────────────────────────────────┘");
 
-        // CSV Export Option
         System.out.print("  Export Complaint Hotspot & Analytics Report to CSV? (Y/N): ");
         String ans = scanner.nextLine().trim();
         if ("Y".equalsIgnoreCase(ans)) {
@@ -857,7 +848,6 @@ public class AdminController {
                 return;
             }
 
-            // Read new password with validation
             for (int attempt = 1; attempt <= 3; attempt++) {
                 System.out.print("Enter new password (or 'cancel'): ");
                 String newPass = scanner.nextLine().trim();
@@ -879,7 +869,6 @@ public class AdminController {
                 if (updated) {
                     adminDAO.updateAccountStatus(admin.getAdminId(), "ACTIVE");
                     System.out.println("✅ Admin password reset successfully! Please login with your new password.");
-                    // Audit log
                     AuditLog audit = new AuditLog();
                     audit.setEntityName("ADMIN");
                     audit.setEntityId(String.valueOf(admin.getAdminId()));
@@ -943,7 +932,6 @@ public class AdminController {
                     loggedInAdmin.setPasswordHash(hashed);
                     System.out.println("✅ Administrator password changed successfully!");
 
-                    // Audit log
                     AuditLog audit = new AuditLog();
                     audit.setEntityName("ADMIN");
                     audit.setEntityId(String.valueOf(loggedInAdmin.getAdminId()));

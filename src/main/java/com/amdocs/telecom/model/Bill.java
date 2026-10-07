@@ -17,7 +17,6 @@ public class Bill {
     private String billStatus; // UNPAID, PAID, OVERDUE, CANCELLED
     private LocalDateTime createdAt;
 
-    // Joined fields
     private int customerId;
     private String customerNumber;
     private String customerName;

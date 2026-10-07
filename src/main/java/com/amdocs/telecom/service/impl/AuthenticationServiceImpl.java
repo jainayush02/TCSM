@@ -61,7 +61,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             customerDAO.logLoginAttempt(username, "CUSTOMER", "127.0.0.1", "SUCCESS");
             logActivity(username, "LOGIN_SUCCESS", "Customer login successful");
             
-            // Reset status if it was active but had previous failures (not locked)
+            // Clear stale failure counts on an active account.
             if (!"ACTIVE".equals(customer.getAccountStatus())) {
                 customerDAO.updateAccountStatus(customer.getCustomerId(), "ACTIVE");
             }
@@ -80,7 +80,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             if (!opt.isPresent()) {
                 throw new AuthenticationException("User not found.");
             }
-            // In a real system, send OTP to mobile/email. Here we return it to display on console.
+            // The console displays the OTP; production would deliver it out of band.
             return OTPService.generateOtp(username);
         } catch (SQLException e) {
             throw new AuthenticationException("Database error: " + e.getMessage());
@@ -114,8 +114,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     @Override
     public void logout(String username) {
-        // Handle session logout logic if applicable. 
-        // For console, returning to main menu acts as logout.
+        // Return to the main menu to end the console session.
     }
 
     private void logActivity(String username, String action, String details) {

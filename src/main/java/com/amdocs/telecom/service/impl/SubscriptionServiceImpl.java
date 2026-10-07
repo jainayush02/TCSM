@@ -48,7 +48,6 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 throw new TelecomException("Business Rule: Inactive plans cannot be selected.");
             }
 
-            // Check if customer already has this plan active
             List<MobileSubscription> existingSubs = subscriptionDAO.findByCustomerId(customerId);
             boolean alreadySubscribed = existingSubs.stream()
                     .anyMatch(sub -> sub.getPlanId() == planId && "ACTIVE".equals(sub.getStatus()));
@@ -56,7 +55,6 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 throw new TelecomException("Business Rule: A customer cannot subscribe to the same plan twice simultaneously.");
             }
 
-            // Find an available SIM
             Optional<SIMCard> simOpt = subscriptionDAO.findAvailableSIM(simTypeStr);
             if (!simOpt.isPresent()) {
                 throw new TelecomException("No available " + simTypeStr + " SIM cards. Please contact administrator.");
@@ -78,7 +76,6 @@ public class SubscriptionServiceImpl implements SubscriptionService {
 
             MobileSubscription created = subscriptionDAO.saveSubscription(sub);
 
-            // Automatically generate the initial monthly bill for the new subscription
             try {
                 String billingMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
                 billingService.generateMonthlyBill(created.getSubscriptionId(), billingMonth);

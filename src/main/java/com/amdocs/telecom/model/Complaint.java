@@ -14,7 +14,6 @@ public class Complaint {
     private String status; // OPEN, IN_PROGRESS, RESOLVED, CLOSED
     private String resolution;
 
-    // Joined fields
     private String customerName;
     private String mobileNumber;
     private String customerCity;
