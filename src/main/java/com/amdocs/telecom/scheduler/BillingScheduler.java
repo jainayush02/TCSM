@@ -3,10 +3,12 @@ package com.amdocs.telecom.scheduler;
 import com.amdocs.telecom.dao.SubscriptionDAO;
 import com.amdocs.telecom.dao.impl.SubscriptionDAOImpl;
 import com.amdocs.telecom.model.MobileSubscription;
+import com.amdocs.telecom.exception.TelecomException;
 import com.amdocs.telecom.service.BillingService;
 import com.amdocs.telecom.service.impl.BillingServiceImpl;
 
 import java.time.LocalDate;
+import java.sql.SQLException;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -32,7 +34,7 @@ public class BillingScheduler {
         Runnable billingTask = () -> runBilling(false);
 
         scheduler.scheduleAtFixedRate(billingTask, initialDelay, period, TimeUnit.SECONDS);
-        LOGGER.info("[BillingScheduler] Scheduled. Initial delay: " + initialDelay + "s, Period: " + period + "s");
+        LOGGER.info(() -> "[BillingScheduler] Scheduled. Initial delay: " + initialDelay + "s, Period: " + period + "s");
     }
 
     public void triggerNow() {
@@ -59,15 +61,17 @@ public class BillingScheduler {
                     billingService.generateMonthlyBill(sub.getSubscriptionId(), billingMonth);
                     generated++;
                     report("  [OK] Bill generated for: " + sub.getSubscriptionNumber(), interactive);
-                } catch (Exception e) { LOGGER.log(Level.WARNING,"Could not bill subscription " + sub.getSubscriptionId(),e); }
+                } catch (SQLException | TelecomException | RuntimeException e) {
+                    LOGGER.log(Level.WARNING, e, () -> "Could not bill subscription " + sub.getSubscriptionId());
+                }
             }
             for(com.amdocs.telecom.model.Bill bill:new com.amdocs.telecom.dao.impl.BillingDAOImpl().findAll()) {
                 if("MONTHLY".equals(bill.getInvoiceType()) && !"CANCELLED".equals(bill.getBillStatus()))
                     ((BillingServiceImpl)billingService).reconcileUsage(bill.getSubscriptionId(),bill.getBillingMonth());
             }
             report("[BillingScheduler] " + runType + " run complete. Bills generated: " + generated, interactive);
-        } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Error during " + runType.toLowerCase(java.util.Locale.ROOT) + " billing", e);
+        } catch (SQLException | TelecomException | RuntimeException e) {
+            LOGGER.log(Level.SEVERE, e, () -> "Error during " + runType.toLowerCase(java.util.Locale.ROOT) + " billing");
             if (interactive) System.out.println("Billing failed. Check the application log for details.");
         }
     }

@@ -5,6 +5,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.Savepoint;
+import java.sql.SQLException;
+import java.util.Objects;
 
 public final class Transactions {
     private static final ThreadLocal<Connection> CURRENT = new ThreadLocal<>();
@@ -14,10 +16,11 @@ public final class Transactions {
     @FunctionalInterface
     public interface Work<T> { T run() throws Exception; }
 
-    public static void lockSubscriptions(java.util.Collection<Integer> ids) throws Exception {
-        if(CURRENT.get()==null) throw new IllegalStateException("A transaction is required.");
+    public static void lockSubscriptions(java.util.Collection<Integer> ids) throws SQLException, TelecomException {
+        Connection connection = CURRENT.get();
+        if (connection == null) throw new IllegalStateException("A transaction is required.");
         for(int id:new java.util.TreeSet<>(ids)) {
-            try(java.sql.PreparedStatement p=CURRENT.get().prepareStatement("SELECT subscription_id FROM mobile_subscriptions WHERE subscription_id=? FOR UPDATE")) {
+            try(java.sql.PreparedStatement p=connection.prepareStatement("SELECT subscription_id FROM mobile_subscriptions WHERE subscription_id=? FOR UPDATE")) {
                 p.setInt(1,id);
                 try(java.sql.ResultSet r=p.executeQuery()) { if(!r.next()) throw new TelecomException("Subscription not found."); }
             }
@@ -47,7 +50,7 @@ public final class Transactions {
                 existing.releaseSavepoint(savepoint);
                 return result;
             } catch (Exception e) {
-                if (savepoint != null) try { existing.rollback(savepoint); } catch (Exception rollback) { e.addSuppressed(rollback); }
+                if (savepoint != null) try { existing.rollback(savepoint); } catch (SQLException rollback) { e.addSuppressed(rollback); }
                 throw failure(e);
             }
         }
@@ -59,14 +62,16 @@ public final class Transactions {
                 connection.commit();
                 return result;
             } catch (Exception e) {
-                try { connection.rollback(); } catch (Exception rollback) { e.addSuppressed(rollback); }
+                try { connection.rollback(); } catch (SQLException rollback) { e.addSuppressed(rollback); }
                 throw failure(e);
             } finally { CURRENT.remove(); }
         } catch (TelecomException e) { throw e; }
-        catch (Exception e) { throw failure(e); }
+        catch (SQLException | RuntimeException e) { throw failure(e); }
     }
 
     private static TelecomException failure(Exception e) {
-        return e instanceof TelecomException ? (TelecomException)e : new TelecomException("Transaction failed: " + e.getMessage(), e);
+        Objects.requireNonNull(e, "Transaction failure cannot be null.");
+        if (e instanceof TelecomException telecomException) return telecomException;
+        return new TelecomException("Transaction failed: " + e.getMessage(), e);
     }
 }

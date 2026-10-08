@@ -1,6 +1,7 @@
 package com.amdocs.telecom.controller;
 
 import com.amdocs.telecom.util.ConsoleMenu;
+import com.amdocs.telecom.util.ConsoleTable;
 
 import com.amdocs.telecom.dto.CustomerRegistrationDTO;
 import com.amdocs.telecom.exception.TelecomException;
@@ -499,20 +500,19 @@ public class CustomerController {
     private void browsePlans() {
         System.out.println("\nAVAILABLE TELECOM PLANS");
         List<TelecomPlan> plans = planService.getAllActivePlans();
+        ConsoleTable table = new ConsoleTable(5, 10, 16, 8, 6, 10, 10, 12);
         if (plans.isEmpty()) {
             System.out.println("  No active plans available.");
         } else {
-            System.out.printf("  %-5s %-10s %-16s %-8s %6s %10s %-10s Rs %s%n",
-                    "ID", "Code", "Name", "Type", "Data", "Voice", "Roaming", "Price");
-            System.out.println("  " + "-".repeat(85));
+            table.header("ID", "Code", "Name", "Type", "Data", "Voice", "Roaming", "Price");
             for (TelecomPlan p : plans) {
-                System.out.printf("  %-5d %-10s %-16s %-8s %4dGB %10s %-10s Rs %.2f%n",
+                table.row(
                         p.getPlanId(), p.getPlanCode(), p.getPlanName(), p.getPlanType(),
-                        p.getDataAllowanceGB(), p.getVoiceDisplay(),
-                        p.isInternationalRoaming() ? "Yes" : "No", p.getMonthlyRental());
+                        p.getDataAllowanceGB() + "GB", p.getVoiceDisplay(),
+                        p.isInternationalRoaming() ? "Yes" : "No", String.format("Rs %.2f", p.getMonthlyRental()));
             }
         }
-        System.out.println("------------------------------------------------------------");
+        table.separator();
     }
 
     private void searchPlans() {
@@ -1027,16 +1027,16 @@ public class CustomerController {
     private void trackCustomerComplaints() {
         List<Complaint> list = complaintService.getCustomerComplaints(loggedInCustomer.getCustomerId());
         System.out.println("\nMY COMPLAINTS & SOLUTIONS");
+        ConsoleTable table = new ConsoleTable(3, 12, 16, 10, 8, 12, 23);
         if (list.isEmpty()) {
             System.out.println("  You have not raised any complaints yet.");
             System.out.println("  If you need help, please select Option 10 'Raise a Complaint'.");
-            System.out.println("------------------------------------------------------------");
+            table.separator();
             return;
         }
 
-        System.out.printf("  %-3s %-12s %-16s %-10s %-8s %-12s %s%n",
+        table.header(
                 "#", "Ticket No", "Date Filed", "Category", "Priority", "Status", "Resolution Status");
-        System.out.println("  " + "-".repeat(84));
 
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
         int index = 1;
@@ -1050,10 +1050,10 @@ public class CustomerController {
                 case "IN_PROGRESS" -> "IN_PROGRESS";
                 default -> "OPEN";
             };
-            System.out.printf("  %-3d %-12s %-16s %-10s %-8s %-12s %s%n",
+            table.row(
                     index++, c.getComplaintNumber(), dateStr, c.getCategory(), c.getPriority(), statusBadge, resStatus);
         }
-        System.out.println("------------------------------------------------------------");
+        table.separator();
 
         System.out.print("\nEnter Ticket Number or # (1-" + list.size() + ") to view complete solution details (or 0 to return): ");
         String input = scanner.nextLine().trim();

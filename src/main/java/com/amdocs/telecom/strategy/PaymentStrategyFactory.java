@@ -11,16 +11,10 @@ public class PaymentStrategyFactory {
         if (mode == null) {
             throw new TelecomException("Payment mode cannot be null.");
         }
-        switch (mode) {
-            case UPI:
-                return new UpiPaymentStrategy();
-            case CARD:
-                return new CardPaymentStrategy();
-            case NET_BANKING:
-            case BANK_TRANSFER:
-                return new NetBankingPaymentStrategy();
-            default:
-                throw new TelecomException("Unsupported payment mode: " + mode);
-        }
+        return switch (mode) {
+            case UPI -> new UpiPaymentStrategy();
+            case CARD -> new CardPaymentStrategy();
+            case NET_BANKING, BANK_TRANSFER -> new NetBankingPaymentStrategy();
+        };
     }
 }

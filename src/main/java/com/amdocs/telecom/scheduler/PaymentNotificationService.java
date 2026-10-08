@@ -3,6 +3,7 @@ package com.amdocs.telecom.scheduler;
 import com.amdocs.telecom.dao.AuditAndNotificationDAO;
 import com.amdocs.telecom.dao.impl.AuditAndNotificationDAOImpl;
 import com.amdocs.telecom.model.Notification;
+import java.sql.SQLException;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -33,7 +34,7 @@ public class PaymentNotificationService {
         for (int i = 0; i < 3; i++) {
             final int workerId = i + 1;
             workerPool.submit((Runnable) () -> {
-                LOGGER.info("[NotificationWorker-" + workerId + "] Started.");
+                LOGGER.info(() -> "[NotificationWorker-" + workerId + "] Started.");
                 // Drain the queue before stopping so queued notifications are not lost.
                 while (running || !notificationQueue.isEmpty()) {
                     try {
@@ -46,7 +47,7 @@ public class PaymentNotificationService {
                         break;
                     }
                 }
-                LOGGER.info("[NotificationWorker-" + workerId + "] Stopped.");
+                LOGGER.info(() -> "[NotificationWorker-" + workerId + "] Stopped.");
             });
         }
         LOGGER.info("[PaymentNotificationService] Started with 3 worker threads.");
@@ -66,14 +67,14 @@ public class PaymentNotificationService {
             enqueued = notificationQueue.offer(notif, ENQUEUE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            LOGGER.warning("[PaymentNotificationService] Thread interrupted while enqueueing notification for customer: " + customerId);
+            LOGGER.warning(() -> "[PaymentNotificationService] Thread interrupted while enqueueing notification for customer: " + customerId);
         }
 
         if (enqueued) {
-            LOGGER.info("[PaymentNotificationService] Notification queued for customer " + customerId);
+            LOGGER.info(() -> "[PaymentNotificationService] Notification queued for customer " + customerId);
         } else {
             // Persist synchronously instead of dropping the notification.
-            LOGGER.severe("[PaymentNotificationService] Queue saturated! Executing synchronous fallback for customer: " + customerId);
+            LOGGER.severe(() -> "[PaymentNotificationService] Queue saturated! Executing synchronous fallback for customer: " + customerId);
             executeEmergencyPersistence(notif);
         }
     }
@@ -81,19 +82,19 @@ public class PaymentNotificationService {
     private void executeEmergencyPersistence(Notification notif) {
         try {
             notificationDAO.createNotification(notif);
-            LOGGER.info("[EmergencyFallback] Successfully persisted notification directly to DB for customer " + notif.getCustomerId());
-        } catch (Exception ex) {
-            LOGGER.log(Level.SEVERE, "[CRITICAL] Emergency DB persistence also failed for customer " + notif.getCustomerId()
-                    + ". Notification data: title='" + notif.getTitle() + "', message='" + notif.getMessage() + "'", ex);
+            LOGGER.info(() -> "[EmergencyFallback] Successfully persisted notification directly to DB for customer " + notif.getCustomerId());
+        } catch (SQLException | RuntimeException ex) {
+            LOGGER.log(Level.SEVERE, ex, () -> "[CRITICAL] Emergency DB persistence also failed for customer " + notif.getCustomerId()
+                    + ". Notification data: title='" + notif.getTitle() + "', message='" + notif.getMessage() + "'");
         }
     }
 
     private void processNotification(Notification notif, int workerId) {
         try {
             notificationDAO.createNotification(notif);
-            LOGGER.info("[NotificationWorker-" + workerId + "] Notification saved for Customer ID " + notif.getCustomerId());
-        } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "[NotificationWorker-" + workerId + "] Failed to persist notification", e);
+            LOGGER.info(() -> "[NotificationWorker-" + workerId + "] Notification saved for Customer ID " + notif.getCustomerId());
+        } catch (SQLException | RuntimeException e) {
+            LOGGER.log(Level.SEVERE, e, () -> "[NotificationWorker-" + workerId + "] Failed to persist notification");
         }
     }
 

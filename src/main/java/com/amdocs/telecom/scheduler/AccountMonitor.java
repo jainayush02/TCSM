@@ -10,8 +10,10 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -89,7 +91,11 @@ public class AccountMonitor {
             report("[AccountMonitor] Bills marked as OVERDUE: " + markedCount, interactive);
             results.add("Total marked OVERDUE: " + markedCount);
 
-        } catch (Exception e) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            LOGGER.log(Level.WARNING, "[AccountMonitor] Scan interrupted", e);
+            if (interactive) System.out.println("Account scan interrupted.");
+        } catch (ExecutionException | TimeoutException | RuntimeException e) {
             LOGGER.log(Level.SEVERE, "[AccountMonitor] Error during scan", e);
             if (interactive) System.out.println("Account scan failed. Check the application log for details.");
         }
@@ -129,7 +135,12 @@ public class AccountMonitor {
             int count = future.get(20, TimeUnit.SECONDS);
             report("[AccountMonitor] Total subscriptions suspended: " + count, interactive);
             return count;
-        } catch (Exception e) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            LOGGER.log(Level.WARNING, "[AccountMonitor] Suspension interrupted", e);
+            if (interactive) System.out.println("Account suspension interrupted.");
+            return 0;
+        } catch (ExecutionException | TimeoutException | RuntimeException e) {
             LOGGER.log(Level.SEVERE, "[AccountMonitor] Error suspending accounts", e);
             if (interactive) System.out.println("Account suspension failed. Check the application log for details.");
             return 0;

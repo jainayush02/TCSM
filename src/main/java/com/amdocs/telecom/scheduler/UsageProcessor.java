@@ -4,13 +4,16 @@ import com.amdocs.telecom.dao.UsageDAO;
 import com.amdocs.telecom.dao.impl.UsageDAOImpl;
 import com.amdocs.telecom.model.UsageRecord;
 import com.amdocs.telecom.model.UsageType;
+import com.amdocs.telecom.exception.TelecomException;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -36,7 +39,7 @@ public class UsageProcessor {
         }
         java.util.List<java.util.concurrent.Future<?>> tasks=new java.util.ArrayList<>();
         System.out.println("\n[UsageProcessor] Processing " + records.size() + " usage records in batches of " + batchSize + "...");
-        LOGGER.info("[UsageProcessor] Starting bulk processing of " + records.size() + " records");
+        LOGGER.info(() -> "[UsageProcessor] Starting bulk processing of " + records.size() + " records");
 
         List<List<UsageRecord>> batches = partitionList(records, batchSize);
         
@@ -58,15 +61,22 @@ public class UsageProcessor {
                         totalProcessed += count;
                     }
                     System.out.println("  [UsageProcessor] Batch #" + batchNumber + " completed: " + count + " records inserted.");
-                } catch (Exception e) {
-                    LOGGER.log(Level.SEVERE, "[UsageProcessor] Batch #" + batchNumber + " failed", e);
+                } catch (TelecomException | RuntimeException e) {
+                    LOGGER.log(Level.SEVERE, e, () -> "[UsageProcessor] Batch #" + batchNumber + " failed");
                     throw new IllegalStateException("Usage batch failed.",e);
                 }
             }));
         }
         for(java.util.concurrent.Future<?> task:tasks) {
             try { task.get(30,TimeUnit.SECONDS); }
-            catch(Exception e) { tasks.forEach(f -> f.cancel(true)); throw new IllegalStateException("Bulk usage processing failed.",e); }
+            catch (InterruptedException e) {
+                tasks.forEach(f -> f.cancel(true));
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Bulk usage processing interrupted.", e);
+            } catch (ExecutionException | TimeoutException | RuntimeException e) {
+                tasks.forEach(f -> f.cancel(true));
+                throw new IllegalStateException("Bulk usage processing failed.", e);
+            }
         }
     }
 
@@ -107,7 +117,7 @@ public class UsageProcessor {
             Thread.currentThread().interrupt();
         }
         System.out.println("[UsageProcessor] Total records processed: " + getTotalProcessed());
-        LOGGER.info("[UsageProcessor] Shut down. Total processed: " + getTotalProcessed());
+        LOGGER.info(() -> "[UsageProcessor] Shut down. Total processed: " + getTotalProcessed());
     }
 
     private <T> List<List<T>> partitionList(List<T> list, int size) {

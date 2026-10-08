@@ -14,21 +14,24 @@ public final class UsageUnits {
         if (type == null || unit == null || !Double.isFinite(quantity) || quantity <= 0)
             throw new IllegalArgumentException("Usage needs a valid type, unit and finite positive quantity.");
         String value = unit.trim().toUpperCase(Locale.ROOT);
-        double result;
-        if (type == UsageType.DATA || type == UsageType.ROAMING) {
-            if (value.equals("GB")) result = quantity * 1024;
-            else if (value.equals("MB")) result = quantity;
-            else if (value.equals("KB")) result = quantity / 1024;
-            else throw new IllegalArgumentException("Data and roaming usage must use KB, MB or GB.");
-        } else if (type == UsageType.VOICE) {
-            if (value.equals("MINUTES") || value.equals("MINUTE") || value.equals("MIN")) result = quantity;
-            else if (value.equals("SECONDS") || value.equals("SECOND")) result = quantity / 60;
-            else throw new IllegalArgumentException("Voice usage must use minutes or seconds.");
-        } else {
-            if (!(value.equals("COUNT") || value.equals("SMS")) || quantity != Math.rint(quantity))
-                throw new IllegalArgumentException("SMS usage must be a whole count.");
-            result = quantity;
-        }
+        double result = switch (type) {
+            case DATA, ROAMING -> switch (value) {
+                case "GB" -> quantity * 1024;
+                case "MB" -> quantity;
+                case "KB" -> quantity / 1024;
+                default -> throw new IllegalArgumentException("Data and roaming usage must use KB, MB or GB.");
+            };
+            case VOICE -> switch (value) {
+                case "MINUTES", "MINUTE", "MIN" -> quantity;
+                case "SECONDS", "SECOND" -> quantity / 60;
+                default -> throw new IllegalArgumentException("Voice usage must use minutes or seconds.");
+            };
+            case SMS -> {
+                if (!(value.equals("COUNT") || value.equals("SMS")) || quantity != Math.rint(quantity))
+                    throw new IllegalArgumentException("SMS usage must be a whole count.");
+                yield quantity;
+            }
+        };
         if (!Double.isFinite(result)) throw new IllegalArgumentException("Usage quantity is too large.");
         return result;
     }

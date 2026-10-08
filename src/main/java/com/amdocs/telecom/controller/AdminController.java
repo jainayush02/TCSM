@@ -1,6 +1,7 @@
 package com.amdocs.telecom.controller;
 
 import com.amdocs.telecom.util.ConsoleMenu;
+import com.amdocs.telecom.util.ConsoleTable;
 
 import com.amdocs.telecom.dao.AdminDAO;
 import com.amdocs.telecom.dao.AuditAndNotificationDAO;
@@ -267,15 +268,15 @@ public class AdminController {
     private void viewAllPlans() {
         List<TelecomPlan> plans = planService.getAllActivePlans();
         System.out.println("\nALL ACTIVE TELECOM PLANS");
-        System.out.printf("  %-4s %-10s %-16s %-8s %6s %10s Rs %-8s %s%n",
-                "ID", "Code", "Name", "Type", "Data", "Voice", "Price", "Status");
-        System.out.println("  " + "-".repeat(85));
+        ConsoleTable table = new ConsoleTable(4, 10, 16, 8, 6, 10, 12, 8);
+        table.header("ID", "Code", "Name", "Type", "Data", "Voice", "Price", "Status");
         for (TelecomPlan p : plans) {
-            System.out.printf("  %-4d %-10s %-16s %-8s %4dGB %10s Rs %-8.2f %s%n",
+            table.row(
                     p.getPlanId(), p.getPlanCode(), p.getPlanName(), p.getPlanType(),
-                    p.getDataAllowanceGB(), p.getVoiceDisplay(), p.getMonthlyRental(), p.getStatus());
+                    p.getDataAllowanceGB() + "GB", p.getVoiceDisplay(),
+                    String.format("Rs %.2f", p.getMonthlyRental()), p.getStatus());
         }
-        System.out.println("------------------------------------------------------------");
+        table.separator();
     }
 
     private void addNewPlan() {
@@ -340,14 +341,14 @@ public class AdminController {
     private void viewAllCustomers() {
         List<Customer> customers = customerService.getAllCustomers();
         System.out.println("\nALL CUSTOMERS");
-        System.out.printf("  %-12s %-20s %-25s %-15s %s%n", "Cust No", "Name", "Email", "City", "Status");
-        System.out.println("  " + "-".repeat(85));
+        ConsoleTable table = new ConsoleTable(12, 20, 25, 15, 10);
+        table.header("Cust No", "Name", "Email", "City", "Status");
         for (Customer c : customers) {
-            System.out.printf("  %-12s %-20s %-25s %-15s %s%n",
+            table.row(
                     c.getCustomerNumber(), c.getFullName(), c.getEmail(), c.getCity(), c.getAccountStatus());
         }
         System.out.println("  Total customers: " + customers.size());
-        System.out.println("------------------------------------------------------------");
+        table.separator();
     }
 
     private void viewAllSubscriptions() {
@@ -454,11 +455,12 @@ public class AdminController {
         if (revenue.isEmpty()) {
             System.out.println("  No revenue data available yet.");
         } else {
-            System.out.printf("  %-12s %8s %12s %12s %12s%n", "Month", "Count", "Sum(Rs )", "Avg(Rs )", "Max(Rs )");
-            System.out.println("  " + "-".repeat(60));
+            ConsoleTable table = new ConsoleTable(12, 8, 12, 12, 12);
+            table.header("Month", "Count", "Sum(Rs)", "Avg(Rs)", "Max(Rs)");
             revenue.forEach((month, stats) ->
-                    System.out.printf("  %-12s %8d %12.2f %12.2f %12.2f%n",
-                            month, stats.getCount(), stats.getSum(), stats.getAverage(), stats.getMax()));
+                    table.row(month, stats.getCount(), String.format("%.2f", stats.getSum()),
+                            String.format("%.2f", stats.getAverage()), String.format("%.2f", stats.getMax())));
+            table.separator();
         }
 
         double avgPerCustomer = reportService.getAverageMonthlyRevenuePerCustomer();
@@ -468,15 +470,16 @@ public class AdminController {
         List<Map<String, Object>> topPlans = reportService.getMostSubscribedPlans();
         if (!topPlans.isEmpty()) {
             System.out.println("\n   MOST SUBSCRIBED PLANS:");
-            System.out.printf("  %-10s %-20s %-12s %s%n", "Code", "Name", "Monthly(Rs )", "Subscribers");
-            System.out.println("  " + "-".repeat(55));
+            ConsoleTable table = new ConsoleTable(10, 20, 14, 11);
+            table.header("Code", "Name", "Monthly(Rs)", "Subscribers");
             for (Map<String, Object> p : topPlans) {
-                System.out.printf("  %-10s %-20s Rs %-11.2f %d%n",
+                table.row(
                         p.get("planCode"),
                         String.valueOf(p.get("planName")),
-                        (Double) p.get("monthlyRental"),
+                        String.format("Rs %.2f", (Double) p.get("monthlyRental")),
                         (Long) p.get("subscriberCount"));
             }
+            table.separator();
         }
 
         // Summarize usage by type with streams.
@@ -566,33 +569,36 @@ public class AdminController {
                 all.stream().filter(c -> filterStatus.equalsIgnoreCase(c.getStatus())).toList() : all;
 
         String title = (filterStatus != null) ? "PENDING / OPEN CUSTOMER COMPLAINTS" : "ALL CUSTOMER COMPLAINTS";
-        System.out.println("\n------------------------------------------------------------" + title + " " + "------------------------------------------------------------".repeat(Math.max(0, 85 - title.length())) + "------------------------------------------------------------");
+        ConsoleTable table = new ConsoleTable(4, 12, 18, 12, 10, 8, 11, 16);
+        System.out.println();
+        table.separator();
+        System.out.println("  " + title);
+        table.separator();
         if (list.isEmpty()) {
             System.out.println("  No complaints found matching criteria.");
-            System.out.println("------------------------------------------------------------" + "------------------------------------------------------------".repeat(90) + "------------------------------------------------------------");
+            table.separator();
             return;
         }
 
-        System.out.printf("  %-4s %-12s %-18s %-12s %-10s %-8s %-11s %s%n",
+        table.header(
                 "ID", "Ticket No", "Customer Name", "City", "Category", "Priority", "Status", "Date Lodged");
-        System.out.println("  " + "-".repeat(90));
 
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
         for (Complaint c : list) {
             String dateStr = c.getCreatedDate() != null ? c.getCreatedDate().format(dtf) : "N/A";
             String custName = c.getCustomerName() != null ? c.getCustomerName() : "Cust #" + c.getCustomerId();
             String city = c.getCustomerCity() != null ? c.getCustomerCity() : "-";
-            System.out.printf("  %-4d %-12s %-18s %-12s %-10s %-8s %-11s %s%n",
+            table.row(
                     c.getComplaintId(),
                     c.getComplaintNumber(),
-                    custName.length() > 18 ? custName.substring(0, 18) : custName,
-                    city.length() > 12 ? city.substring(0, 12) : city,
+                    custName,
+                    city,
                     c.getCategory(),
                     c.getPriority(),
                     c.getStatus(),
                     dateStr);
         }
-        System.out.println("------------------------------------------------------------" + "------------------------------------------------------------".repeat(90) + "------------------------------------------------------------");
+        table.separator();
 
         long openCount = all.stream().filter(c -> "OPEN".equalsIgnoreCase(c.getStatus())).count();
         long inProgCount = all.stream().filter(c -> "IN_PROGRESS".equalsIgnoreCase(c.getStatus())).count();
@@ -759,9 +765,9 @@ public class AdminController {
         }
 
         System.out.println("   1. COMPLAINT HOTSPOTS BY CITY / LOCATION (Where complaints are highest):");
-        System.out.printf("  %-4s %-16s %7s %6s %8s %8s %8s   %s%n",
+        ConsoleTable cityTable = new ConsoleTable(4, 16, 7, 6, 8, 8, 8, 34);
+        cityTable.header(
                 "Rank", "City / Area", "Total", "Open", "In-Prog", "Resolved", "Share %", "Hotspot Level");
-        System.out.println("  " + "-".repeat(76));
 
         int rank = 1;
         for (Map.Entry<String, int[]> entry : cityStats.entrySet()) {
@@ -778,27 +784,27 @@ public class AdminController {
                 hotspotBadge = " NORMAL";
             }
 
-            System.out.printf("  %-4d %-16s %7d %6d %8d %8d %7.1f%%   %s%n",
-                    rank++, city, c[0], c[1], c[2], c[3], share, hotspotBadge);
+            cityTable.row(rank++, city, c[0], c[1], c[2], c[3], String.format("%.1f%%", share), hotspotBadge);
         }
+        cityTable.separator();
 
         System.out.println("\n   2. COMPLAINT DISTRIBUTION BY PROBLEM CATEGORY:");
-        System.out.printf("  %-16s %7s %6s %8s %8s %8s%n",
+        ConsoleTable categoryTable = new ConsoleTable(16, 7, 6, 8, 8, 8);
+        categoryTable.header(
                 "Category", "Total", "Open", "In-Prog", "Resolved", "Share %");
-        System.out.println("  " + "-".repeat(60));
 
         for (Map.Entry<String, int[]> entry : catStats.entrySet()) {
             String cat = entry.getKey();
             int[] c = entry.getValue();
             double share = grandTotal > 0 ? ((double) c[0] / grandTotal) * 100.0 : 0.0;
-            System.out.printf("  %-16s %7d %6d %8d %8d %7.1f%%%n",
-                    cat, c[0], c[1], c[2], c[3], share);
+            categoryTable.row(cat, c[0], c[1], c[2], c[3], String.format("%.1f%%", share));
         }
+        categoryTable.separator();
 
         System.out.println("\n   3. TOP COMPLAINANT CUSTOMERS (Customers raising the most complaints):");
-        System.out.printf("  %-12s %-18s %-12s %-12s %6s %8s %8s%n",
+        ConsoleTable customerTable = new ConsoleTable(12, 18, 12, 12, 6, 8, 8);
+        customerTable.header(
                 "Cust No", "Customer Name", "City", "Mobile", "Total", "Pending", "Resolved");
-        System.out.println("  " + "-".repeat(76));
 
         for (Map<String, Object> map : topCustomers) {
             String custNo = String.valueOf(map.get("customerNumber"));
@@ -809,26 +815,28 @@ public class AdminController {
             int pen = (Integer) map.get("pendingCount");
             int res = (Integer) map.get("resolvedCount");
 
-            System.out.printf("  %-12s %-18s %-12s %-12s %6d %8d %8d%n",
+            customerTable.row(
                     custNo,
-                    name.length() > 18 ? name.substring(0, 18) : name,
-                    city.length() > 12 ? city.substring(0, 12) : city,
+                    name,
+                    city,
                     mob, tot, pen, res);
         }
+        customerTable.separator();
 
         List<Map<String, Object>> multiComplaints = complaintService.getCustomersWithMultipleComplaints(2);
         if (!multiComplaints.isEmpty()) {
             System.out.println("\n   4. FREQUENT COMPLAINANTS (SQL HAVING >= 2 Complaints Filter):");
-            System.out.printf("  %-12s %-20s %-14s %-14s %s%n", "Cust No", "Name", "City", "Mobile", "Complaints");
-            System.out.println("  " + "-".repeat(68));
+            ConsoleTable table = new ConsoleTable(12, 20, 14, 14, 10);
+            table.header("Cust No", "Name", "City", "Mobile", "Complaints");
             for (Map<String, Object> map : multiComplaints) {
-                System.out.printf("  %-12s %-20s %-14s %-14s %d%n",
+                table.row(
                         map.get("customerNumber"),
                         map.get("customerName"),
                         map.get("city"),
                         map.get("mobileNumber"),
                         (Integer) map.get("complaintCount"));
             }
+            table.separator();
         }
 
         System.out.println("------------------------------------------------------------");
